@@ -123,3 +123,57 @@ export interface EntryCreateRequest {
 }
 
 export type EntryUpdateRequest = EntryCreateRequest
+
+// ---- entries (cycle 7b: read side) -----------------------------------------
+
+export type EntryListOrder = 'newest' | 'oldest'
+
+export interface EntryListParams {
+  limit?: number
+  offset?: number
+  order?: EntryListOrder
+  q?: string | null
+  book?: string | null
+  tag?: string | null
+  from_date?: string | null // ISO YYYY-MM-DD
+  to_date?: string | null
+}
+
+export interface AppliedFilters {
+  q: string | null
+  book: string | null
+  tag: string | null
+  from_date: string | null
+  to_date: string | null
+}
+
+export interface EntryListResponse {
+  entries: EntryResponse[]
+  total: number
+  limit: number
+  offset: number
+  applied_filters: AppliedFilters
+}
+
+export interface CalendarDay {
+  entry_date: string // ISO YYYY-MM-DD
+  count: number
+}
+
+export interface CalendarResponse {
+  year: number
+  month: number
+  days: CalendarDay[]
+  total: number
+}
+
+export interface OnThisDayResponse {
+  target_date: string // ISO YYYY-MM-DD
+  entries: EntryResponse[]
+}
+
+export interface PassageEntriesResponse {
+  reference: ResolvedReference
+  count: number
+  entries: EntryResponse[]
+}
