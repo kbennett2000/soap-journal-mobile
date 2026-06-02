@@ -45,10 +45,12 @@ describe('AppShell + BottomTabBar', () => {
     await renderShell()
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
 
+    // Use a still-stub tab (Calendar) so the assertion doesn't depend on a
+    // feature page's content; it's purely about active-tab state.
     const user = userEvent.setup()
-    await user.click(screen.getByRole('link', { name: 'Reader' }))
-    await screen.findByRole('heading', { name: 'Reader' })
-    expect(screen.getByRole('link', { name: 'Reader' })).toHaveAttribute('aria-current', 'page')
+    await user.click(screen.getByRole('link', { name: 'Calendar' }))
+    await screen.findByRole('heading', { name: 'Calendar' })
+    expect(screen.getByRole('link', { name: 'Calendar' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current')
   })
 

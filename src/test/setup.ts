@@ -24,6 +24,12 @@ if (hasWindow && typeof window.matchMedia !== 'function') {
   })
 }
 
+// happy-dom doesn't implement scrollIntoView; the reader's jump-highlight calls
+// it. Stub it so those code paths don't throw under test.
+if (hasWindow && typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = vi.fn()
+}
+
 beforeEach(() => {
   if (!hasWindow) return
   // Each UI test starts with no persisted theme and a clean document root.
