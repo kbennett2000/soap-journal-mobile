@@ -9,6 +9,7 @@ import { ChapterSkeleton } from "@/components/reader/ChapterSkeleton";
 import { JumpBar } from "@/components/reader/JumpBar";
 import { SettingsPopover } from "@/components/reader/SettingsPopover";
 import { TranslationPicker } from "@/components/reader/TranslationPicker";
+import { PassageEntriesBadge } from "@/components/PassageEntriesBadge";
 import { useChapter, useTranslationDetail, useTranslations } from "@/hooks/useBible";
 import {
   readFontSize,
@@ -25,6 +26,7 @@ import type {
   ChapterPointer,
   ResolvedReference,
   TranslationSummary,
+  VerseResponse,
 } from "@/types/api";
 
 const DEFAULT_LOCATION = {
@@ -157,6 +159,18 @@ function ReaderInner({
     navigateTo(newCode, bookName, chapterNumber);
   }
 
+  function handleVerseClick(verse: VerseResponse): void {
+    // Click-verse-to-journal: pre-fill the new-entry form with this verse's
+    // reference and the current translation (mirrors the web reader, via
+    // React Router state).
+    navigate("/entries/new", {
+      state: {
+        scriptureRef: `${bookName} ${chapterNumber}:${verse.number}`,
+        translationCode,
+      },
+    });
+  }
+
   useEffect(() => {
     function onKey(event: KeyboardEvent): void {
       const target = event.target as HTMLElement | null;
@@ -204,11 +218,23 @@ function ReaderInner({
       )}
 
       {chapterQuery.data && (
+        <PassageEntriesBadge
+          // Remount per chapter so the expand state doesn't bleed across
+          // navigation. Coordinates are translation-agnostic (Model B), so the
+          // ref alone keys the badge.
+          key={`${bookName} ${chapterNumber}`}
+          passageRef={`${bookName} ${chapterNumber}`}
+          translationCode={translationCode}
+        />
+      )}
+
+      {chapterQuery.data && (
         <ChapterContent
           chapter={chapterQuery.data}
           layout={layout}
           fontSize={fontSize}
           highlightRange={highlightRange}
+          onVerseClick={handleVerseClick}
         />
       )}
 

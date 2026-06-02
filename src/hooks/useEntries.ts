@@ -1,17 +1,28 @@
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import { useDb } from "@/hooks/useDb";
-import { getEntry, listEntries } from "@/lib/db/entries";
-import type { EntryListParams, EntryListResponse, EntryResponse } from "@/types/api";
+import { deleteEntry, getEntry, listEntries, saveEntry } from "@/lib/db/entries";
+import type {
+  EntryCreateRequest,
+  EntryListParams,
+  EntryListResponse,
+  EntryResponse,
+} from "@/types/api";
 
 /**
- * TanStack Query hooks for the entry read paths. Same query keys, caching, and
- * return shapes as the web app — only the data source changed: each query calls
- * a `lib/db/entries` repository through `useDb` instead of HTTP. The
- * repositories throw the same `ApiError` the UI already handles.
+ * TanStack Query hooks for the entries feature. Same query keys, caching, and
+ * return shapes as the web app — only the data source changed: each query /
+ * mutation calls a `lib/db/entries` repository through `useDb` instead of HTTP.
+ * The repositories throw the same `ApiError` the UI already handles.
  *
- * The write mutations (create/update/delete) and calendar / on-this-day hooks
- * land in later cycles (12b and beyond).
+ * Calendar / on-this-day hooks (`useCalendar`/`useOnThisDay`) land with those
+ * pages in a later cycle; their invalidation keys are already emitted here so
+ * those views refresh correctly once built (matches the web hook).
  */
 
 /**
@@ -48,5 +59,53 @@ export function useEntry(entryId: number | undefined): UseQueryResult<EntryRespo
     queryKey: ["entries", "detail", entryId] as const,
     queryFn: () => getEntry(db, entryId as number),
     enabled: typeof entryId === "number" && Number.isFinite(entryId),
+  });
+}
+
+/**
+ * Invalidate every view that could reflect an entry change. Mirrors the web
+ * hook's invalidation set: list + calendar + on-this-day + the reader's
+ * passage-entries badge + the tag list (tags are get-or-created on save).
+ */
+function invalidateAllEntryViews(
+  qc: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: ["entries", "list"] }),
+    qc.invalidateQueries({ queryKey: ["entries", "calendar"] }),
+    qc.invalidateQueries({ queryKey: ["entries", "onThisDay"] }),
+    qc.invalidateQueries({ queryKey: ["bible", "passageEntries"] }),
+    qc.invalidateQueries({ queryKey: ["tags", "list"] }),
+  ]).then(() => undefined);
+}
+
+/**
+ * Create (no `entryId`) or update (with `entryId`) an entry. The web app's
+ * separate `useCreateEntry`/`useUpdateEntry` collapse onto the single
+ * `saveEntry(db, input, entryId?)` repository call. On success, refresh all
+ * entry views; for an update also refresh that entry's detail cache.
+ */
+export function useSaveEntry(entryId?: number) {
+  const db = useDb();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EntryCreateRequest) => saveEntry(db, input, entryId),
+    onSuccess: async () => {
+      await invalidateAllEntryViews(qc);
+      if (entryId !== undefined) {
+        await qc.invalidateQueries({ queryKey: ["entries", "detail", entryId] });
+      }
+    },
+  });
+}
+
+export function useDeleteEntry() {
+  const db = useDb();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) => deleteEntry(db, entryId),
+    onSuccess: async () => {
+      await invalidateAllEntryViews(qc);
+    },
   });
 }

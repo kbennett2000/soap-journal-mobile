@@ -3,6 +3,10 @@ import { render, type RenderResult } from '@testing-library/react'
 import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 
+type InitialEntry = NonNullable<
+  React.ComponentProps<typeof MemoryRouter>['initialEntries']
+>[number]
+
 import { DbProvider } from '@/context/DbProvider'
 import { ALL_BOOKS } from '@/lib/bible/books'
 import { createBetterSqliteExecutor } from '@/lib/db/betterSqliteConnection'
@@ -57,7 +61,9 @@ export function makeMemoryDbInitializer(code = 'TST'): () => Promise<DbExecutor>
 
 interface RenderAppOptions {
   initialize?: () => Promise<DbExecutor>
-  initialEntries?: string[]
+  // `InitialEntry` allows path strings or `{ pathname, state }` location objects
+  // (the latter mirrors the reader's verse→entry navigation, which passes state).
+  initialEntries?: InitialEntry[]
   queryClient?: QueryClient
 }
 

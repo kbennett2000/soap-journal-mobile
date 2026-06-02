@@ -55,6 +55,44 @@ export function makeEntriesInitializer(seed: SeedEntry[] = []): () => Promise<Db
   };
 }
 
+export interface CapturingInitializer {
+  /** Pass to `renderApp({ initialize })`. */
+  initialize: () => Promise<DbExecutor>;
+  /** The executor created by the most recent `initialize()` call (post-render). */
+  db: () => DbExecutor;
+}
+
+/**
+ * Like `makeEntriesInitializer`, but also exposes the created executor so a
+ * test can round-trip: drive the form UI, then assert via the REAL
+ * `getEntry`/`listEntries` repositories against the same DB.
+ */
+export function makeCapturingEntriesInitializer(
+  seed: SeedEntry[] = [],
+): CapturingInitializer {
+  let captured: DbExecutor | null = null;
+  const initialize = async (): Promise<DbExecutor> => {
+    const db = createBetterSqliteExecutor(":memory:");
+    await runMigrations(db);
+    await loadTranslation(db, buildTranslation());
+    let i = 0;
+    for (const s of seed) {
+      i += 1;
+      const now = s.now ?? `2026-06-02T12:00:${String(i).padStart(2, "0")}.000Z`;
+      await saveEntry(db, s.input, undefined, now);
+    }
+    captured = db;
+    return db;
+  };
+  return {
+    initialize,
+    db: () => {
+      if (!captured) throw new Error("initializer has not run yet");
+      return captured;
+    },
+  };
+}
+
 /** A small, varied seed across John/Romans/Psalms; tags faith/grace/family. */
 export const DEFAULT_SEED: SeedEntry[] = [
   {

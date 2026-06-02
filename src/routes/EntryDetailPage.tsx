@@ -1,20 +1,30 @@
-import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { useEntry } from "@/hooks/useEntries";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useDeleteEntry, useEntry } from "@/hooks/useEntries";
 import { ApiError } from "@/lib/db/errors";
 import type { EntryResponse } from "@/types/api";
 
 /**
- * Read-only entry detail. Edit/Delete actions (and the ConfirmDialog) arrive
- * with the write path in cycle 12b; for now the page renders the entry and a
- * read-only "Open in reader" link.
+ * Entry detail with Edit + Delete actions. Delete is gated behind a
+ * ConfirmDialog and, on success, navigates back to the list.
  */
 export function EntryDetailPage(): JSX.Element {
   const { entryId: entryIdParam } = useParams<{ entryId: string }>();
   const entryId = Number.parseInt(entryIdParam ?? "", 10);
   const validId = Number.isFinite(entryId) && entryId > 0;
 
+  const navigate = useNavigate();
+  const deleteMutation = useDeleteEntry();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   const query = useEntry(validId ? entryId : undefined);
+
+  async function handleConfirmDelete(): Promise<void> {
+    await deleteMutation.mutateAsync(entryId);
+    navigate("/entries");
+  }
 
   if (!validId) {
     return <NotFoundPanel />;
@@ -89,21 +99,49 @@ export function EntryDetailPage(): JSX.Element {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-        {openInReader && (
+        <div className="flex flex-wrap gap-2">
           <Link
-            to={openInReader}
+            to={`/entries/${entry.id}/edit`}
+            className="inline-flex h-9 items-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+          >
+            Edit
+          </Link>
+          {openInReader && (
+            <Link
+              to={openInReader}
+              className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              Open in reader
+            </Link>
+          )}
+          <Link
+            to="/entries"
             className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
-            Open in reader
+            Back to entries
           </Link>
-        )}
-        <Link
-          to="/entries"
-          className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+        </div>
+        <button
+          type="button"
+          onClick={() => setConfirmingDelete(true)}
+          disabled={deleteMutation.isPending}
+          className="inline-flex h-9 items-center rounded-md border border-rose-300 bg-white px-4 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950"
         >
-          Back to entries
-        </Link>
+          Delete
+        </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete entry"
+        message="Delete this entry? This cannot be undone."
+        confirmLabel={deleteMutation.isPending ? "Deleting…" : "Delete"}
+        destructive
+        onConfirm={() => {
+          void handleConfirmDelete();
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </article>
   );
 }
