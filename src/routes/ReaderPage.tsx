@@ -4,6 +4,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-
 import { BookPicker } from "@/components/reader/BookPicker";
 import { ChapterContent } from "@/components/reader/ChapterContent";
 import { ChapterError } from "@/components/reader/ChapterError";
+import { ChapterPane } from "@/components/reader/ChapterPane";
 import { ChapterPicker } from "@/components/reader/ChapterPicker";
 import { ChapterSkeleton } from "@/components/reader/ChapterSkeleton";
 import { JumpBar } from "@/components/reader/JumpBar";
@@ -80,7 +81,10 @@ function ReaderInner({
   chapterNumber,
 }: ReaderInnerProps): JSX.Element {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const compareCode = searchParams.get("compare");
+  const isCompareMode = compareCode !== null && compareCode.length > 0;
 
   const translationsQuery = useTranslations();
   const translationDetailQuery = useTranslationDetail(translationCode);
@@ -129,6 +133,9 @@ function ReaderInner({
   ): void {
     const next = new URLSearchParams();
     if (range) next.set("range", `${range.start}-${range.end}`);
+    // Preserve compare mode across book/chapter/translation navigation.
+    const currentCompare = searchParams.get("compare");
+    if (currentCompare) next.set("compare", currentCompare);
     const search = next.toString() ? `?${next.toString()}` : "";
     navigate(
       `/read/${encodeURIComponent(code)}/${encodeURIComponent(book)}/${chapter}${search}`,
@@ -156,19 +163,61 @@ function ReaderInner({
   }
 
   function handleTranslationChange(newCode: string): void {
+    // Swap-guard: picking the comparison pane's code in the primary picker
+    // swaps the panes rather than showing the same translation twice.
+    if (isCompareMode && newCode === compareCode) {
+      const next = new URLSearchParams(searchParams);
+      next.set("compare", translationCode);
+      navigate(
+        `/read/${encodeURIComponent(newCode)}/${encodeURIComponent(bookName)}/${chapterNumber}?${next.toString()}`,
+      );
+      return;
+    }
     navigateTo(newCode, bookName, chapterNumber);
   }
 
-  function handleVerseClick(verse: VerseResponse): void {
+  function handleVerseClick(verse: VerseResponse, paneCode?: string): void {
     // Click-verse-to-journal: pre-fill the new-entry form with this verse's
-    // reference and the current translation (mirrors the web reader, via
-    // React Router state).
+    // reference and the tapped pane's translation (the comparison pane passes
+    // its own code; single-pane defaults to the primary). Mirrors the web
+    // reader, via React Router state.
+    const code = paneCode ?? translationCode;
     navigate("/entries/new", {
       state: {
         scriptureRef: `${bookName} ${chapterNumber}:${verse.number}`,
-        translationCode,
+        translationCode: code,
       },
     });
+  }
+
+  function handleCompare(): void {
+    const other = translations.find((t) => t.code !== translationCode);
+    if (!other) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("compare", other.code);
+    setSearchParams(next, { replace: true });
+  }
+
+  function handleCompareTranslationChange(newCode: string): void {
+    // Swap-guard: picking the primary's code in the comparison picker swaps
+    // the panes (the old comparison becomes primary).
+    if (newCode === translationCode) {
+      const next = new URLSearchParams(searchParams);
+      next.set("compare", translationCode);
+      navigate(
+        `/read/${encodeURIComponent(compareCode!)}/${encodeURIComponent(bookName)}/${chapterNumber}?${next.toString()}`,
+      );
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.set("compare", newCode);
+    setSearchParams(next, { replace: true });
+  }
+
+  function handleCloseCompare(): void {
+    const next = new URLSearchParams(searchParams);
+    next.delete("compare");
+    setSearchParams(next, { replace: true });
   }
 
   useEffect(() => {
@@ -198,44 +247,81 @@ function ReaderInner({
         currentBookChapterCount={currentBook?.chapter_count ?? 1}
         fontSize={fontSize}
         layout={layout}
+        isCompareMode={isCompareMode}
         onBookChange={handleBookChange}
         onChapterChange={handleChapterChange}
         onResolved={handleResolved}
         onChangeFontSize={setFontSize}
         onChangeLayout={setLayout}
         onTranslationChange={handleTranslationChange}
+        onCompare={handleCompare}
       />
 
-      {chapterQuery.isLoading && <ChapterSkeleton />}
+      {isCompareMode ? (
+        // Phone-first: true two columns (not stacked) so the same verse is
+        // visible in both at once; verse layout is forced so verses roughly
+        // align. min-w-0 on each pane prevents overflow.
+        <div className="grid grid-cols-2 gap-3">
+          <ChapterPane
+            translationCode={translationCode}
+            bookName={bookName}
+            chapterNumber={chapterNumber}
+            layout="verse"
+            fontSize={fontSize}
+            highlightRange={highlightRange}
+            translations={translations}
+            onTranslationChange={handleTranslationChange}
+            onVerseClick={handleVerseClick}
+            label="Primary translation"
+          />
+          <ChapterPane
+            translationCode={compareCode!}
+            bookName={bookName}
+            chapterNumber={chapterNumber}
+            layout="verse"
+            fontSize={fontSize}
+            highlightRange={highlightRange}
+            translations={translations}
+            onTranslationChange={handleCompareTranslationChange}
+            onVerseClick={handleVerseClick}
+            onClose={handleCloseCompare}
+            label="Comparison translation"
+          />
+        </div>
+      ) : (
+        <>
+          {chapterQuery.isLoading && <ChapterSkeleton />}
 
-      {chapterQuery.isError && (
-        <ChapterError
-          error={chapterQuery.error}
-          onRetry={() => {
-            void chapterQuery.refetch();
-          }}
-        />
-      )}
+          {chapterQuery.isError && (
+            <ChapterError
+              error={chapterQuery.error}
+              onRetry={() => {
+                void chapterQuery.refetch();
+              }}
+            />
+          )}
 
-      {chapterQuery.data && (
-        <PassageEntriesBadge
-          // Remount per chapter so the expand state doesn't bleed across
-          // navigation. Coordinates are translation-agnostic (Model B), so the
-          // ref alone keys the badge.
-          key={`${bookName} ${chapterNumber}`}
-          passageRef={`${bookName} ${chapterNumber}`}
-          translationCode={translationCode}
-        />
-      )}
+          {chapterQuery.data && (
+            <PassageEntriesBadge
+              // Remount per chapter so the expand state doesn't bleed across
+              // navigation. Coordinates are translation-agnostic (Model B), so
+              // the ref alone keys the badge.
+              key={`${bookName} ${chapterNumber}`}
+              passageRef={`${bookName} ${chapterNumber}`}
+              translationCode={translationCode}
+            />
+          )}
 
-      {chapterQuery.data && (
-        <ChapterContent
-          chapter={chapterQuery.data}
-          layout={layout}
-          fontSize={fontSize}
-          highlightRange={highlightRange}
-          onVerseClick={handleVerseClick}
-        />
+          {chapterQuery.data && (
+            <ChapterContent
+              chapter={chapterQuery.data}
+              layout={layout}
+              fontSize={fontSize}
+              highlightRange={highlightRange}
+              onVerseClick={(v) => handleVerseClick(v)}
+            />
+          )}
+        </>
       )}
 
       {chapterQuery.data && (
@@ -260,15 +346,21 @@ interface ControlsBarProps {
   currentBookChapterCount: number;
   fontSize: FontSize;
   layout: ReaderLayout;
+  isCompareMode: boolean;
   onBookChange: (name: string) => void;
   onChapterChange: (chapter: number) => void;
   onResolved: (reference: ResolvedReference) => void;
   onChangeFontSize: (size: FontSize) => void;
   onChangeLayout: (layout: ReaderLayout) => void;
   onTranslationChange: (code: string) => void;
+  onCompare: () => void;
 }
 
 function ControlsBar(props: ControlsBarProps): JSX.Element {
+  const compareDisabled = props.translations.length < 2;
+  const compareTitle = compareDisabled
+    ? "Compare translations becomes available when a second translation is loaded — see the README for instructions."
+    : "Compare translations";
   return (
     <div className="flex flex-wrap items-start gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <BookPicker
@@ -289,6 +381,22 @@ function ControlsBar(props: ControlsBarProps): JSX.Element {
         currentCode={props.translationCode}
         onChange={props.onTranslationChange}
       />
+      {!props.isCompareMode && (
+        <button
+          type="button"
+          disabled={compareDisabled}
+          title={compareTitle}
+          aria-label="Compare translations"
+          onClick={props.onCompare}
+          className={`inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium ${
+            compareDisabled
+              ? "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
+              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          }`}
+        >
+          Compare translations
+        </button>
+      )}
       <SettingsPopover
         fontSize={props.fontSize}
         layout={props.layout}
