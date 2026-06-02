@@ -24,6 +24,31 @@ artifact produced from canonical JSONs that are generated out-of-band:
 gitignored. This build step is an operational task, not part of the test suite (it needs
 the real translation JSONs).
 
+## Building the Android app
+
+The native Android build (Capacitor 8) **requires JDK 21** — Gradle fails with
+`invalid source release: 21` on JDK 17. The Android SDK must also be available
+(`ANDROID_HOME` or `android/local.properties` → `sdk.dir`).
+
+Point Gradle at a JDK 21 once, so you never have to export `JAVA_HOME` per build, by
+adding it to your **user-global** `~/.gradle/gradle.properties` (never committed):
+
+```properties
+org.gradle.java.home=/absolute/path/to/jdk-21
+```
+
+(`android/gradle.properties` is committed by Capacitor and holds shared build flags, so a
+machine-specific JDK path belongs in `~/.gradle/gradle.properties`, not there. Exporting
+`JAVA_HOME=/path/to/jdk-21` per shell also works.) No JDK 21 installed? A portable
+Temurin 21 tarball extracted anywhere works — point `org.gradle.java.home` at it.
+
+Then, with the prebuilt asset in place (above):
+
+```bash
+npm run build && npx cap sync android      # carry web + DB asset into the native project
+npx cap run android                         # build, install, launch on a connected device
+```
+
 ---
 
 This project was bootstrapped from the React + TypeScript + Vite template.

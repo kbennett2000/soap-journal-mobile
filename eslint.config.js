@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // 'dist' = web build output; 'android' = the native Capacitor project (incl.
+  // Gradle build intermediates like merged Capacitor JS) — neither is ours to lint.
+  globalIgnores(['dist', 'android']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
