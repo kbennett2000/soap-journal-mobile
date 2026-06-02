@@ -177,3 +177,19 @@ export interface PassageEntriesResponse {
   count: number
   entries: EntryResponse[]
 }
+
+// ---- tags (cycle 8: read repository) ---------------------------------------
+
+export interface TagSummary {
+  id: number
+  name: string
+  entry_count: number
+}
+
+export interface TagListResponse {
+  tags: TagSummary[]
+}
+
+export interface TagAutocompleteResponse {
+  tags: TagSummary[]
+}
