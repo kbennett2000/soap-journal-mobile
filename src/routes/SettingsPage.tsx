@@ -1,9 +1,10 @@
+import { BackupRestore } from '@/components/BackupRestore'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { TranslationImport } from '@/components/TranslationImport'
 
 /**
- * Settings — theme toggle + translation import. Backup/restore + about land in
- * later cycles.
+ * Settings — theme toggle, translation import, and backup/restore. About lands
+ * in a later cycle.
  */
 export function SettingsPage(): JSX.Element {
   return (
@@ -20,9 +21,7 @@ export function SettingsPage(): JSX.Element {
 
       <TranslationImport />
 
-      <p className="text-sm text-slate-600 dark:text-slate-300">
-        Backup &amp; restore are coming soon.
-      </p>
+      <BackupRestore />
     </section>
   )
 }
