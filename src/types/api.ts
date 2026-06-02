@@ -87,3 +87,39 @@ export interface ResolvedReferenceResponse {
   reference: ResolvedReference
   verses: VerseResponse[]
 }
+
+// ---- entries (cycle 7a: write path) ----------------------------------------
+
+export interface EntryTagSummary {
+  id: number
+  name: string
+}
+
+export interface EntryResponse {
+  id: number
+  title: string | null
+  display_title: string
+  entry_date: string // ISO YYYY-MM-DD
+  scripture_ref: string
+  translation_code: string
+  scripture_text: string
+  observation: string
+  application: string
+  prayer: string
+  tags: EntryTagSummary[]
+  created_at: string // ISO-8601 UTC
+  updated_at: string // ISO-8601 UTC
+}
+
+export interface EntryCreateRequest {
+  title?: string | null
+  entry_date?: string | null // ISO YYYY-MM-DD
+  scripture_ref: string
+  translation_code?: string | null
+  observation?: string
+  application?: string
+  prayer?: string
+  tags?: string[]
+}
+
+export type EntryUpdateRequest = EntryCreateRequest
