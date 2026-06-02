@@ -6,8 +6,16 @@ import {
 } from "@tanstack/react-query";
 
 import { useDb } from "@/hooks/useDb";
-import { deleteEntry, getEntry, listEntries, onThisDay, saveEntry } from "@/lib/db/entries";
+import {
+  calendar,
+  deleteEntry,
+  getEntry,
+  listEntries,
+  onThisDay,
+  saveEntry,
+} from "@/lib/db/entries";
 import type {
+  CalendarResponse,
   EntryCreateRequest,
   EntryListParams,
   EntryListResponse,
@@ -76,6 +84,23 @@ export function useOnThisDay(
   return useQuery({
     queryKey: ["entries", "onThisDay", date ?? null, yearsBack ?? null] as const,
     queryFn: () => onThisDay(db, date, yearsBack),
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Per-day entry counts for a month, for the calendar grid. Same query
+ * key/shape as the web app; the data source is the cycle-7b `calendar`
+ * repository via `useDb`. Invalidated by `invalidateAllEntryViews`.
+ */
+export function useCalendar(
+  year: number,
+  month: number,
+): UseQueryResult<CalendarResponse> {
+  const db = useDb();
+  return useQuery({
+    queryKey: ["entries", "calendar", year, month] as const,
+    queryFn: () => calendar(db, year, month),
     staleTime: 60_000,
   });
 }
