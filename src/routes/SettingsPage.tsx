@@ -1,8 +1,9 @@
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { TranslationImport } from '@/components/TranslationImport'
 
 /**
- * Settings — stub. The theme toggle lives here (its documented future home).
- * Import + backup/restore + about land in later cycles.
+ * Settings — theme toggle + translation import. Backup/restore + about land in
+ * later cycles.
  */
 export function SettingsPage(): JSX.Element {
   return (
@@ -17,8 +18,10 @@ export function SettingsPage(): JSX.Element {
         <ThemeToggle />
       </div>
 
+      <TranslationImport />
+
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        Import translations and backup &amp; restore are coming soon.
+        Backup &amp; restore are coming soon.
       </p>
     </section>
   )

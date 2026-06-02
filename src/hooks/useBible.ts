@@ -1,7 +1,13 @@
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import { useDb } from "@/hooks/useDb";
 import { getChapter, getTranslationDetail, listTranslations } from "@/lib/db/bible";
+import { importTranslationFromText } from "@/lib/db/importTranslation";
 import type {
   ChapterResponse,
   TranslationDetailResponse,
@@ -60,5 +66,20 @@ export function useChapter(
       typeof chapterNumber === "number" &&
       chapterNumber >= 1,
     staleTime: Infinity,
+  });
+}
+
+/**
+ * Import a canonical-JSON translation from a picked file's text. Mirrors the
+ * entry mutations' shape. On success it invalidates the whole `["bible"]` tree
+ * — not just the translation list — because a replace-by-code import also
+ * changes chapter / translation-detail content the reader and compare cache.
+ */
+export function useImportTranslation() {
+  const db = useDb();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (text: string) => importTranslationFromText(db, text),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["bible"] }),
   });
 }
