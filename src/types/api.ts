@@ -1,0 +1,89 @@
+/**
+ * Response shapes for the data layer, mirroring the soap-journal web frontend's
+ * `types/api.ts` so the ported hooks and components consume them unchanged.
+ * Where the web app received these as JSON over HTTP, this app's `lib/db`
+ * repositories return the same shapes from local SQLite.
+ *
+ * Fields are snake_case: they are the canonical JSON/response contract shared
+ * with the server, not internal app structures.
+ *
+ * This file grows per cycle. Cycle 6 adds the Bible-reader types; entry/tag/
+ * passage types arrive with their repositories.
+ */
+
+// One definition of Testament lives in the books module; re-export it so
+// consumers importing from `@/types/api` (as the ported UI does) still get it.
+export type { Testament } from '@/lib/bible/books'
+
+import type { Testament } from '@/lib/bible/books'
+
+export interface TranslationSummary {
+  code: string
+  name: string
+  language: string
+  copyright: string
+}
+
+export interface TranslationListResponse {
+  translations: TranslationSummary[]
+}
+
+export interface BookSummary {
+  name: string
+  abbreviation: string
+  order_index: number
+  testament: Testament
+  chapter_count: number
+}
+
+export interface TranslationDetailResponse {
+  translation: TranslationSummary
+  books: BookSummary[]
+}
+
+export interface FootnoteResponse {
+  id: number
+  text: string
+}
+
+export interface VerseResponse {
+  id: number
+  number: number
+  text: string
+  is_red_letter: boolean
+  footnotes: FootnoteResponse[]
+}
+
+export interface HeadingResponse {
+  before_verse: number
+  text: string
+}
+
+export interface ChapterPointer {
+  book_name: string
+  chapter_number: number
+}
+
+export interface ChapterResponse {
+  translation_code: string
+  book: BookSummary
+  chapter_number: number
+  verses: VerseResponse[]
+  headings: HeadingResponse[]
+  previous: ChapterPointer | null
+  next: ChapterPointer | null
+}
+
+export interface ResolvedReference {
+  canonical_string: string
+  translation_code: string
+  book: BookSummary
+  chapter_number: number
+  start_verse: number
+  end_verse: number
+}
+
+export interface ResolvedReferenceResponse {
+  reference: ResolvedReference
+  verses: VerseResponse[]
+}
