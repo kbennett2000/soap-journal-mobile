@@ -6,12 +6,13 @@ import {
 } from "@tanstack/react-query";
 
 import { useDb } from "@/hooks/useDb";
-import { deleteEntry, getEntry, listEntries, saveEntry } from "@/lib/db/entries";
+import { deleteEntry, getEntry, listEntries, onThisDay, saveEntry } from "@/lib/db/entries";
 import type {
   EntryCreateRequest,
   EntryListParams,
   EntryListResponse,
   EntryResponse,
+  OnThisDayResponse,
 } from "@/types/api";
 
 /**
@@ -59,6 +60,23 @@ export function useEntry(entryId: number | undefined): UseQueryResult<EntryRespo
     queryKey: ["entries", "detail", entryId] as const,
     queryFn: () => getEntry(db, entryId as number),
     enabled: typeof entryId === "number" && Number.isFinite(entryId),
+  });
+}
+
+/**
+ * "On this day in previous years" for the dashboard. Same query key/shape as
+ * the web app; the data source is the cycle-7b `onThisDay` repository via
+ * `useDb`. Invalidated by `invalidateAllEntryViews` on every entry mutation.
+ */
+export function useOnThisDay(
+  date?: string,
+  yearsBack?: number,
+): UseQueryResult<OnThisDayResponse> {
+  const db = useDb();
+  return useQuery({
+    queryKey: ["entries", "onThisDay", date ?? null, yearsBack ?? null] as const,
+    queryFn: () => onThisDay(db, date, yearsBack),
+    staleTime: 60_000,
   });
 }
 
