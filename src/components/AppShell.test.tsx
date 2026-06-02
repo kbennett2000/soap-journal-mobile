@@ -32,7 +32,7 @@ describe('AppShell + BottomTabBar', () => {
     await renderShell()
 
     await user.click(screen.getByRole('link', { name: 'Entries' }))
-    expect(await screen.findByRole('heading', { name: 'Entries' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your entries' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Calendar' }))
     expect(await screen.findByRole('heading', { name: 'Calendar' })).toBeInTheDocument()
