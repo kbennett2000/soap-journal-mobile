@@ -4,11 +4,19 @@ How the on-device database comes to life, stays alive across app updates, and gr
 when you import a translation. Read with `schema.md` (tables + migration model) and
 `architecture.md` (the data flow).
 
-> **Plugin API note:** the prebuilt-asset and copy mechanics below describe
-> `@capacitor-community/sqlite` behavior. The plugin is at v8.1.0 and the exact
-> asset-folder layout, `databases.json` manifest, and database-name suffixing have
-> specific requirements — CC should verify the precise API against the plugin's
-> current docs when implementing, rather than trusting these names verbatim.
+> **Plugin API note (verified against `@capacitor-community/sqlite` v8.1.0 source,
+> cycles 5b + 10):**
+> - Asset folder: **`public/assets/databases/`** (Vite copies `public/` → `dist/`;
+>   `cap sync` lands it in the Android assets). The native `copyFromAssets` enumerates
+>   that folder directly — **no `databases.json` is needed on Android** (that manifest is
+>   only the web/electron path).
+> - Asset format: a **plain `.db` file** (`soapjournal.db`). The plugin does NOT use gzip;
+>   its only compressed option is a `.zip` archive, which we don't use.
+> - Name contract: the plugin appends `SQLite` before `.db` (`addSQLiteSuffix`), so the
+>   asset `soapjournal.db` is opened by the app as `createConnection("soapjournal")`
+>   (stored internally as `soapjournalSQLite.db`).
+> - `copyFromAssets(overwrite: false)` is the first-launch guard — it copies only when no
+>   working DB exists, so app updates never clobber user data.
 
 ## The three moments
 
@@ -29,11 +37,12 @@ also the single thing worth backing up.
 ## First launch: copy, then migrate
 
 ```
-on app startup, before any repository call:
-  1. open the SQLite connection
-  2. PRAGMA foreign_keys = ON          # SQLite defaults this OFF
-  3. copyFromAssets({ overwrite: false })   # copies the prebuilt DB IFF none exists
-  4. run the migration runner (below)
+on app startup, before any repository call (see src/lib/db/appDb.ts):
+  1. copyFromAssets(overwrite: false)   # copies the prebuilt DB IFF none exists — first
+                                        #   (must precede opening the connection)
+  2. createConnection("soapjournal") + open   # reuse via isConnection/retrieveConnection
+  3. PRAGMA foreign_keys = ON           # SQLite defaults this OFF; per connection
+  4. run the migration runner (below)   # no-op when the asset is at the target user_version
 ```
 
 - **`copyFromAssets` with `overwrite: false`** is the first-launch guard *and* the
