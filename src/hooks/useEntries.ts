@@ -110,7 +110,7 @@ export function useCalendar(
  * hook's invalidation set: list + calendar + on-this-day + the reader's
  * passage-entries badge + the tag list (tags are get-or-created on save).
  */
-function invalidateAllEntryViews(
+export function invalidateAllEntryViews(
   qc: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
   return Promise.all([

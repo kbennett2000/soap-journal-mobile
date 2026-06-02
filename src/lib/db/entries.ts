@@ -173,7 +173,7 @@ async function resolveScripture(
 
 // ---- tag get-or-create (mirrors core/entries._resolve_tags, no user_id) ----
 
-async function resolveTags(
+export async function resolveTags(
   executor: DbExecutor,
   names: string[],
   now: string,
