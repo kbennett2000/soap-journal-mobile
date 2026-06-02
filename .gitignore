@@ -14,6 +14,12 @@ android/local.properties
 # User-supplied copyrighted Bible translation JSONs (never commit)
 bibles-private/
 
+# Public-domain canonical JSONs consumed by build-bible-db (generated out-of-band)
+bibles-canonical/
+
+# Prebuilt Bible asset emitted by `npm run build-bible-db` (build artifact)
+public/assets/databases/
+
 # Logs
 *.log
 npm-debug.log*

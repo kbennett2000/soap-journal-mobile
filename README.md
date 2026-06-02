@@ -1,4 +1,32 @@
-# React + TypeScript + Vite
+# soap-journal-mobile
+
+Offline, single-user SOAP journaling app with a built-in Bible reader (Capacitor +
+React + TypeScript, Android target). See `docs/` for architecture, schema, and the
+TS-porting plan.
+
+## Building the prebuilt Bible asset
+
+The app ships a prebuilt SQLite database (Bible text populated, journal tables empty)
+that is copied into place on first launch. It is **not** committed — it's a build
+artifact produced from canonical JSONs that are generated out-of-band:
+
+1. Generate the 13 public-domain canonical JSONs with the server repo's
+   `build-translation` command (one `.json` per translation).
+2. Drop them in `bibles-canonical/` (gitignored).
+3. Run `npm run build-bible-db` — validates each file against the canonical schema and
+   emits `public/assets/databases/soapjournal.db` (a malformed file fails loudly and
+   writes nothing).
+4. `npm run build` then `npx cap sync android` carry the asset into the Android project
+   (`public/` → `dist/` → Android assets). The app opens it as
+   `createConnection("soapjournal")`.
+
+`bibles-canonical/` (inputs) and `public/assets/databases/` (the asset) are both
+gitignored. This build step is an operational task, not part of the test suite (it needs
+the real translation JSONs).
+
+---
+
+This project was bootstrapped from the React + TypeScript + Vite template.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

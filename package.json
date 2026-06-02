@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "build-bible-db": "vite-node scripts/build-bible-db.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "typescript": "5.6.3",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
+    "vite-node": "^6.0.0",
     "vitest": "4.1.7"
   }
 }
