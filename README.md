@@ -3,13 +3,18 @@
 # SOAP Journal
 
 A warm, distraction-free way to **read the Bible and journal through it** on your Android
-phone — completely offline. Read in any of **13 built-in translations**, compare two
+phone (Android only — there's no iPhone/iPad version; here's why → [iOS](#ios)) — completely
+offline. Read in any of **13 built-in translations**, compare two
 side by side, and capture what you're learning with the time-tested **SOAP** method
 (Scripture · Observation · Application · Prayer).
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Platform: Android](https://img.shields.io/badge/Platform-Android-3DDC84.svg)
 ![Works offline](https://img.shields.io/badge/Works-offline-555.svg)
+
+📱 **Android only** — no iPhone/iPad version ([why](#ios)).
+
+**Contents:** [Is this for you?](#is-this-for-you) · [Install on Android](#install-on-android) · [Using SOAP Journal](#using-soap-journal) · [Add your own translations](#add-your-own-translations-esv-nlt-nkjv-net) · [Backup & restore](#backup--restore) · [Build from source](#build-from-source-for-developers) · [The 13 translations](#the-13-built-in-translations)
 
 ---
 
@@ -123,6 +128,9 @@ A two-minute tour:
 
 ---
 
+<details>
+<summary><strong>Add your own translations (ESV, NLT, NKJV, NET)</strong> — optional / advanced; click to expand</summary>
+
 ## Add your own translations (ESV, NLT, NKJV, NET)
 
 **Optional and more advanced.** The 13 built-in translations are public-domain or freely
@@ -150,6 +158,8 @@ README won't duplicate those steps — follow the tool's own docs.)
 Once imported, it appears in the reader and the compare picker like any other translation.
 The **NET Bible** additionally carries inline translator's notes with tappable
 cross-references.
+
+</details>
 
 ---
 
@@ -188,6 +198,9 @@ To move to a new phone: export on the old device, install the app on the new one
 restore. Details in [docs/backup-and-restore.md](docs/backup-and-restore.md).
 
 ---
+
+<details>
+<summary><strong>Build from source (for developers)</strong> — click to expand</summary>
 
 ## Build from source (for developers)
 
@@ -292,6 +305,8 @@ update — so this bump is not optional.
 
 More design detail lives in [`docs/`](docs/) (architecture, schema, first-run & import,
 backup & restore).
+
+</details>
 
 ---
 
