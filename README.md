@@ -3,8 +3,7 @@
 # SOAP Journal
 
 A warm, distraction-free way to **read the Bible and journal through it** on your Android
-phone (Android only — there's no iPhone/iPad version; here's why → [iOS](#ios)) — completely
-offline. Read in any of **13 built-in translations**, compare two
+phone — completely offline. Read in any of **13 built-in translations**, compare two
 side by side, and capture what you're learning with the time-tested **SOAP** method
 (Scripture · Observation · Application · Prayer).
 
@@ -14,22 +13,13 @@ side by side, and capture what you're learning with the time-tested **SOAP** met
 
 📱 **Android only** — no iPhone/iPad version ([why](#ios)).
 
-**Contents:** [Is this for you?](#is-this-for-you) · [Install on Android](#install-on-android) · [Using SOAP Journal](#using-soap-journal) · [Add your own translations](#add-your-own-translations-esv-nlt-nkjv-net) · [Backup & restore](#backup--restore) · [Build from source](#build-from-source-for-developers) · [The 13 translations](#the-13-built-in-translations)
-
----
-
-## Screenshots
-
-| Reading | A translator's note | Compare (landscape) |
-| --- | --- | --- |
-| ![Reader](docs/screenshots/usage-reader.png) | ![Note with cross-references](docs/screenshots/usage-reader-net-note.png) | ![Side-by-side compare](docs/screenshots/usage-compare-landscape.png) |
-
-| Journaling a verse | Your dashboard |
+| Reading | A translator's note |
 | --- | --- |
-| ![New entry from a verse](docs/screenshots/usage-entry-from-verse.png) | ![Dashboard](docs/screenshots/usage-dashboard.png) |
+| ![Reading a chapter](docs/screenshots/usage-reader.png) | ![A translator's note with cross-references](docs/screenshots/usage-reader-net-note.png) |
 
-> 💡 **Compare reads best in landscape** — turn your phone sideways and the two
-> translations sit side by side. Upright, they stack one above the other.
+👉 **[Install on Android](#install-on-android)** — download, allow the install, open. That's it.
+
+**Contents:** [Is this for you?](#is-this-for-you) · [Install on Android](#install-on-android) · [Using SOAP Journal](#using-soap-journal) · [Add your own translations](#add-your-own-translations-esv-nlt-nkjv-net) · [Backup & restore](#backup--restore) · [Build from source](#build-from-source-for-developers) · [The 13 translations](#the-13-built-in-translations)
 
 ---
 
@@ -54,26 +44,21 @@ first one really is.
 
 ## Features
 
-- **A real Bible reader.** 13 translations built in. Pick a book and chapter, or use the
-  **jump-to-a-passage** bar (e.g. `John 3:16` or `Romans 8:28-30`). Choose your text size
-  and verse-by-verse or flowing-paragraph layout. Light and dark themes.
-- **Compare two translations** side by side (best in landscape; stacked when upright) —
-  each pane has its own translation picker.
-- **Journal with the SOAP method.** Tap a verse to start an entry; the Scripture text and
-  reference are filled in for you. Write your Observation, Application, and Prayer, add
-  tags, and save.
-- **Find your way back.** Search and filter **your journal** (by word, book, tag, or date),
-  browse a **calendar** of the days you wrote, and revisit **"on this day in previous
-  years."** A badge in the reader shows how many entries you've written on the chapter
-  you're reading.
-- **Optional translator's notes.** If you add the NET Bible (see below), its verses carry
-  inline, tappable footnote markers — translator/study/text-critical notes with
-  **cross-references you can tap to jump to the passage**.
-- **Bring your own translations.** Import any translation you have the right to use, as a
-  prepared file, from Settings.
+- **A real Bible reader.** 13 translations built in; jump to any passage (`John 3:16`,
+  `Romans 8:28-30`) or use the book/chapter pickers. Adjustable text size, verse or
+  paragraph layout, light/dark.
+- **Compare two translations** side by side — each pane has its own picker (best in landscape).
+- **SOAP journaling.** Tap a verse and the Scripture + reference are pre-filled; add your
+  Observation, Application, Prayer, and tags.
+- **Find your way back.** Search and filter **your journal** by word, book, tag, or date; a
+  **calendar** of the days you wrote; **"on this day in previous years";** and an
+  entries-on-this-chapter badge in the reader.
+- **Optional translator's notes** (NET Bible): inline, tappable footnote markers with
+  **cross-references that jump to the passage**.
+- **Bring your own translations** — import any you have the right to use, from Settings.
 - **Back up and restore your journal** to a file you control.
-- **Yours and private.** 100% offline — no account, no sign-in, no cloud, no tracking.
-  Your journal lives only on your phone.
+- **Private by default.** Fully offline — no account, no cloud, no tracking; your journal
+  stays on your phone.
 
 > A quick, honest note on what's **not** here (yet): there's no full-text search of the
 > Bible itself (you navigate by reference), no verse highlighting, no multi-device sync,
@@ -112,17 +97,18 @@ A two-minute tour:
 
 - **Read.** The **Reader** tab opens your last place. Use the book/chapter pickers or the
   jump bar; adjust text size and verse/paragraph layout from the settings (gear) button.
-  ![Reading](docs/screenshots/usage-reader.png)
 - **Compare.** Tap **Compare translations**, then turn your phone to landscape to see two
   translations side by side. Each side has its own picker.
   ![Compare](docs/screenshots/usage-compare-landscape.png)
+
+  > 💡 **Compare reads best in landscape** — turn your phone sideways and the two
+  > translations sit side by side. Upright, they stack one above the other.
 - **Journal a verse.** Tap any verse to start a SOAP entry with the reference and text
   pre-filled; add your Observation, Application, Prayer, and tags.
   ![New entry from a verse](docs/screenshots/usage-entry-from-verse.png)
 - **Look back.** The **Entries** tab lists and filters everything you've written; the
   **Calendar** tab shows the days you journaled; the **Dashboard** surfaces recent entries
   and "on this day in previous years."
-  ![Dashboard](docs/screenshots/usage-dashboard.png)
 - **Make it yours.** The **Settings** tab has the light/dark theme, translation import, and
   backup & restore.
 
@@ -178,8 +164,11 @@ The tool for **building your own translation files** lives in that project; this
 
 ## iOS
 
-There's no iPhone/iPad version. Building for iOS requires a Mac, which this project doesn't
-target. Contributions from someone set up for iOS development are welcome.
+There's no iPhone or iPad version, and likely won't be. Building for iOS requires a Mac
+(which this project doesn't have), but that's only the start: unlike Android, iOS has no
+simple sideload path, so publishing to others means a paid Apple Developer account
+(~$99/year) and App Store review. For a free, offline hobby project, that cost and overhead
+don't make sense. Contributions from someone already set up for iOS are welcome.
 
 ---
 
@@ -314,6 +303,9 @@ backup & restore).
 
 Twelve are public domain; **BSB** is freely licensed (a public-domain-style dedication).
 
+<details>
+<summary>Show all 13</summary>
+
 | Code | Translation |
 | --- | --- |
 | **BSB** | Berean Standard Bible *(default)* |
@@ -329,6 +321,8 @@ Twelve are public domain; **BSB** is freely licensed (a public-domain-style dedi
 | WBT | Webster's Bible Translation (1833) |
 | WEB | World English Bible |
 | YLT | Young's Literal Translation (1898) |
+
+</details>
 
 ---
 
