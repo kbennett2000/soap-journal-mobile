@@ -281,6 +281,15 @@ Android refuses to install an APK signed by a different key over an existing one
 user would have to uninstall and reinstall (losing local data). Keep
 `soapjournal-release.keystore` and `keystore.properties` off git and in safe storage.
 
+### Versioning each release
+
+The app version lives in [`android/app/build.gradle`](android/app/build.gradle)
+(`defaultConfig` → `versionCode` / `versionName`). For **every** release, **bump
+`versionCode`** (1 → 2 → 3 …) and set `versionName` to the new SemVer (e.g. `"1.1.0"`), add a
+matching entry to [`CHANGELOG.md`](CHANGELOG.md), and sign with the **same keystore** as
+before. A non-increasing `versionCode` makes Android **reject** the new APK as an in-place
+update — so this bump is not optional.
+
 More design detail lives in [`docs/`](docs/) (architecture, schema, first-run & import,
 backup & restore).
 

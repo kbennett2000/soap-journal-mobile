@@ -18,8 +18,12 @@ android {
         applicationId "com.kbennett.soapjournal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // App version. EVERY release MUST bump versionCode (1 → 2 → 3 …) or Android
+        // will refuse to install the new APK over an existing one. versionName is the
+        // human SemVer shown to users (e.g. "1.1.0"); always sign releases with the
+        // same keystore.
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
