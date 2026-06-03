@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { isOmittedVerse } from "@/lib/bibleText";
+import { buildVerseParts } from "@/lib/verseSegments";
 import type { FontSize, ReaderLayout } from "@/lib/storage";
 import type {
   ChapterResponse,
@@ -76,6 +77,22 @@ export function ChapterContent({
   const sizeClass = FONT_SIZE_CLASS[fontSize];
   const verseRef = useScrollToFirstHighlight(highlightRange?.start);
 
+  // Exactly one note is open at a time; tapping a marker (inline typed or
+  // end-of-verse plain) opens THAT note in an in-flow NoteView next to its verse
+  // (replaces the old absolute popover that clipped off-screen).
+  const [openNote, setOpenNote] = useState<FootnoteResponse | null>(null);
+
+  const layoutProps: LayoutProps = {
+    chapter,
+    headingsByVerse,
+    highlightRange,
+    verseRef,
+    onVerseClick,
+    openNote,
+    onNoteClick: setOpenNote,
+    onCloseNote: () => setOpenNote(null),
+  };
+
   return (
     <article
       data-testid="chapter-content"
@@ -85,21 +102,9 @@ export function ChapterContent({
         {chapter.book.name} {chapter.chapter_number}
       </h1>
       {layout === "verse" ? (
-        <VerseLayout
-          chapter={chapter}
-          headingsByVerse={headingsByVerse}
-          highlightRange={highlightRange}
-          verseRef={verseRef}
-          onVerseClick={onVerseClick}
-        />
+        <VerseLayout {...layoutProps} />
       ) : (
-        <ParagraphLayout
-          chapter={chapter}
-          headingsByVerse={headingsByVerse}
-          highlightRange={highlightRange}
-          verseRef={verseRef}
-          onVerseClick={onVerseClick}
-        />
+        <ParagraphLayout {...layoutProps} />
       )}
     </article>
   );
@@ -159,62 +164,146 @@ function Heading({ heading }: HeadingProps): JSX.Element {
   );
 }
 
-interface FootnoteMarkerProps {
-  footnotes: FootnoteResponse[];
-  translationCode: string;
+/** Inline marker for a typed note (anchored at its char_offset), showing its number. */
+function NoteMarker({
+  number,
+  onClick,
+}: {
+  number: number;
+  onClick: (event: React.MouseEvent) => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      data-testid="note-marker"
+      aria-label={`Note ${number}`}
+      onClick={onClick}
+      className="mx-0.5 align-super text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+    >
+      {number}
+    </button>
+  );
 }
 
-function FootnoteMarker({ footnotes, translationCode }: FootnoteMarkerProps): JSX.Element | null {
-  const [open, setOpen] = useState(false);
-  if (footnotes.length === 0) return null;
+/** End-of-verse marker for a plain footnote (char_offset === null). */
+function PlainFootnoteMarker({
+  onClick,
+}: {
+  onClick: (event: React.MouseEvent) => void;
+}): JSX.Element {
   return (
-    <span className="relative inline-block align-super text-xs">
-      <button
-        type="button"
-        aria-label="Footnote"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-      >
-        ⁿ
-      </button>
-      {open && (
-        <span
-          role="note"
-          className="absolute left-1/2 z-10 mt-1 w-64 -translate-x-1/2 space-y-2 rounded border border-slate-200 bg-white p-2 text-left text-xs text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-        >
-          {footnotes.map((f) => (
-            <span key={f.id} className="block">
-              {f.note_type && (
-                <span
-                  data-testid="note-type"
-                  className="mb-0.5 block font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300"
-                >
-                  {NOTE_TYPE_LABELS[f.note_type]}
-                </span>
-              )}
-              <span className="block whitespace-pre-wrap">{f.text}</span>
-              {f.cross_refs.length > 0 && (
-                <span className="mt-1 flex flex-wrap gap-1">
-                  {f.cross_refs.map((xr, i) => (
-                    <Link
-                      key={`${xr.to_book}-${xr.to_chapter}-${xr.to_verse_start}-${i}`}
-                      to={crossRefUrl(translationCode, xr)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded border border-sky-200 bg-white px-2 py-0.5 text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300"
-                    >
-                      {crossRefLabel(xr)}
-                    </Link>
-                  ))}
-                </span>
-              )}
-            </span>
-          ))}
-        </span>
+    <button
+      type="button"
+      aria-label="Footnote"
+      onClick={onClick}
+      className="mx-0.5 align-super text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+    >
+      ⁿ
+    </button>
+  );
+}
+
+/**
+ * A verse's body: text runs with inline typed-note markers at their offsets,
+ * then an end-of-verse marker per plain footnote. Both kinds open their note via
+ * `onNoteClick` (stopPropagation so a marker tap doesn't fire the verse's own
+ * onVerseClick).
+ */
+function VerseText({
+  verse,
+  onNoteClick,
+}: {
+  verse: VerseResponse;
+  onNoteClick: (note: FootnoteResponse) => void;
+}): JSX.Element {
+  const parts = buildVerseParts(verse.text, verse.footnotes);
+  const plain = verse.footnotes.filter((f) => f.char_offset === null);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.type === "marker" ? (
+          <NoteMarker
+            key={`m-${part.note.id}`}
+            number={part.number}
+            onClick={(e) => {
+              e.stopPropagation();
+              onNoteClick(part.note);
+            }}
+          />
+        ) : (
+          <span key={`t-${i}`}>{part.text}</span>
+        ),
       )}
-    </span>
+      {plain.map((f) => (
+        <PlainFootnoteMarker
+          key={`p-${f.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onNoteClick(f);
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * The opened note, rendered in-flow (a full-width block adjacent to its verse)
+ * so it can't clip off-screen. Type label (when typed), text, and cross-ref
+ * chips that navigate; a close affordance.
+ */
+function NoteView({
+  note,
+  translationCode,
+  onClose,
+}: {
+  note: FootnoteResponse;
+  translationCode: string;
+  onClose: () => void;
+}): JSX.Element {
+  return (
+    <aside
+      role="note"
+      data-testid="note-view"
+      className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+    >
+      <div className="mb-1 flex items-start gap-2">
+        {note.note_type && (
+          <span
+            data-testid="note-type"
+            className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300"
+          >
+            {NOTE_TYPE_LABELS[note.note_type]}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          aria-label="Close note"
+          className="ml-auto text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+        >
+          ×
+        </button>
+      </div>
+      <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{note.text}</p>
+      {note.cross_refs.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {note.cross_refs.map((xr, i) => (
+            <Link
+              key={`${xr.to_book}-${xr.to_chapter}-${xr.to_verse_start}-${i}`}
+              to={crossRefUrl(translationCode, xr)}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded border border-sky-200 bg-white px-2 py-0.5 text-xs text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300"
+            >
+              {crossRefLabel(xr)}
+            </Link>
+          ))}
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -226,6 +315,14 @@ interface LayoutProps {
   highlightRange?: { start: number; end: number };
   verseRef: (el: HTMLElement | null) => void;
   onVerseClick?: (verse: VerseResponse) => void;
+  openNote: FootnoteResponse | null;
+  onNoteClick: (note: FootnoteResponse) => void;
+  onCloseNote: () => void;
+}
+
+/** True when `openNote` is one of this verse's footnotes. */
+function verseOwnsNote(verse: VerseResponse, openNote: FootnoteResponse | null): boolean {
+  return openNote !== null && verse.footnotes.some((f) => f.id === openNote.id);
 }
 
 function VerseLayout({
@@ -234,6 +331,9 @@ function VerseLayout({
   highlightRange,
   verseRef,
   onVerseClick,
+  openNote,
+  onNoteClick,
+  onCloseNote,
 }: LayoutProps): JSX.Element {
   return (
     <div className="space-y-1">
@@ -251,11 +351,7 @@ function VerseLayout({
             <span className="mr-2 inline-block min-w-[1.5rem] text-right font-semibold text-slate-400 dark:text-slate-500">
               {verse.number}
             </span>
-            <span>{verse.text}</span>
-            <FootnoteMarker
-              footnotes={verse.footnotes}
-              translationCode={chapter.translation_code}
-            />
+            <VerseText verse={verse} onNoteClick={onNoteClick} />
           </>
         );
         return (
@@ -282,6 +378,13 @@ function VerseLayout({
                 {inner}
               </div>
             )}
+            {verseOwnsNote(verse, openNote) && (
+              <NoteView
+                note={openNote!}
+                translationCode={chapter.translation_code}
+                onClose={onCloseNote}
+              />
+            )}
           </div>
         );
       })}
@@ -295,6 +398,9 @@ function ParagraphLayout({
   highlightRange,
   verseRef,
   onVerseClick,
+  openNote,
+  onNoteClick,
+  onCloseNote,
 }: LayoutProps): JSX.Element {
   // Walk the chapter in order, emitting <h2> blocks where a heading
   // precedes a verse and accumulating verses into a running <p> in
@@ -333,11 +439,7 @@ function ParagraphLayout({
         <sup className="mr-1 font-semibold text-slate-400 dark:text-slate-500">
           {verse.number}
         </sup>
-        <span>{verse.text}</span>
-        <FootnoteMarker
-          footnotes={verse.footnotes}
-          translationCode={chapter.translation_code}
-        />
+        <VerseText verse={verse} onNoteClick={onNoteClick} />
       </>
     );
     buffer.push(
@@ -364,6 +466,20 @@ function ParagraphLayout({
       ),
     );
     buffer.push(" ");
+
+    // An open note breaks the paragraph so its block NoteView can sit right
+    // after the verse (block asides can't live inside a <p>).
+    if (verseOwnsNote(verse, openNote)) {
+      flush();
+      nodes.push(
+        <NoteView
+          key={`note-${openNote!.id}`}
+          note={openNote!}
+          translationCode={chapter.translation_code}
+          onClose={onCloseNote}
+        />,
+      );
+    }
   }
   flush();
 
