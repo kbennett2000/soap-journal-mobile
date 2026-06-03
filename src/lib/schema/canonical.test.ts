@@ -5,6 +5,8 @@ import { ALL_BOOKS } from '@/lib/bible/books'
 import {
   CanonicalBookSchema,
   CanonicalChapterSchema,
+  CanonicalCrossRefSchema,
+  CanonicalFootnoteSchema,
   CanonicalTranslationSchema,
   CanonicalVerseSchema,
 } from '@/lib/schema/canonical'
@@ -241,5 +243,115 @@ describe('canonical schema — field constraints', () => {
 
   it('empty verse text is rejected', () => {
     expectInvalid(CanonicalVerseSchema, { number: 1, text: '' })
+  })
+})
+
+// ---- footnote notes & cross-refs -------------------------------------------
+// Re-expression of schema_test.py's note/cross-ref cases. Asserts ACCEPTANCE of
+// the extended footnote shape (translator's notes); STORAGE of this metadata is
+// a later cycle — the loader still writes text-only footnotes until then.
+
+describe('canonical schema — footnote notes & cross-refs', () => {
+  it('a typed, char-anchored note with cross-refs validates and round-trips', () => {
+    const chapter = CanonicalChapterSchema.parse({
+      number: 1,
+      verses: [{ number: 1, text: 'In the beginning God created' }],
+      footnotes: [
+        {
+          verse_number: 1,
+          text: 'tn The Hebrew term…',
+          note_type: 'tn',
+          char_offset: 13,
+          marker: 1,
+          ordinal: 0,
+          cross_refs: [
+            { to_book_order_index: 43, to_chapter: 1, to_verse_start: 1 },
+            { to_book_order_index: 19, to_chapter: 33, to_verse_start: 6, to_verse_end: 9 },
+          ],
+        },
+      ],
+    })
+    const fn = chapter.footnotes[0]
+    expect(fn.note_type).toBe('tn')
+    expect(fn.char_offset).toBe(13)
+    expect(fn.ordinal).toBe(0)
+    expect(fn.cross_refs[1].to_verse_end).toBe(9)
+  })
+
+  it('accepts all four note types', () => {
+    for (const note_type of ['tn', 'sn', 'tc', 'map'] as const) {
+      const fn = CanonicalFootnoteSchema.parse({ verse_number: 1, text: 'x', note_type })
+      expect(fn.note_type).toBe(note_type)
+    }
+  })
+
+  it('rejects an unknown note type', () => {
+    expectInvalid(CanonicalFootnoteSchema, { verse_number: 1, text: 'x', note_type: 'xx' })
+  })
+
+  it('allows char_offset equal to the verse length', () => {
+    const chapter = CanonicalChapterSchema.parse({
+      number: 1,
+      verses: [{ number: 1, text: 'abc' }],
+      footnotes: [{ verse_number: 1, text: 'x', char_offset: 3 }],
+    })
+    expect(chapter.footnotes[0].char_offset).toBe(3)
+  })
+
+  it('rejects char_offset beyond the verse length', () => {
+    expectInvalid(
+      CanonicalChapterSchema,
+      {
+        number: 1,
+        verses: [{ number: 1, text: 'abc' }],
+        footnotes: [{ verse_number: 1, text: 'x', char_offset: 4 }],
+      },
+      'beyond verse length',
+    )
+  })
+
+  it('rejects a negative char_offset', () => {
+    expectInvalid(CanonicalFootnoteSchema, { verse_number: 1, text: 'x', char_offset: -1 })
+  })
+
+  it('rejects a cross-ref whose end is before its start', () => {
+    expectInvalid(
+      CanonicalCrossRefSchema,
+      { to_book_order_index: 1, to_chapter: 1, to_verse_start: 10, to_verse_end: 5 },
+      'before to_verse_start',
+    )
+  })
+
+  it('allows a cross-ref whose end equals its start', () => {
+    const ref = CanonicalCrossRefSchema.parse({
+      to_book_order_index: 1,
+      to_chapter: 1,
+      to_verse_start: 5,
+      to_verse_end: 5,
+    })
+    expect(ref.to_verse_end).toBe(5)
+  })
+
+  it('a plain {verse_number,text} footnote still validates with defaults', () => {
+    const fn = CanonicalFootnoteSchema.parse({ verse_number: 1, text: 'see Ps 23' })
+    expect(fn.note_type).toBeNull()
+    expect(fn.char_offset).toBeNull()
+    expect(fn.marker).toBeNull()
+    expect(fn.ordinal).toBeNull()
+    expect(fn.cross_refs).toEqual([])
+  })
+
+  it('an ESV-shaped footnote with explicit-null note fields validates (regression)', () => {
+    const fn = CanonicalFootnoteSchema.parse({
+      verse_number: 1,
+      text: 'Or some rendering',
+      note_type: null,
+      char_offset: null,
+      marker: null,
+      ordinal: null,
+      cross_refs: [],
+    })
+    expect(fn.note_type).toBeNull()
+    expect(fn.cross_refs).toEqual([])
   })
 })

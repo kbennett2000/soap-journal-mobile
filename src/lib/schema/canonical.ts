@@ -39,10 +39,40 @@ export const CanonicalHeadingSchema = z
   })
   .strict()
 
+/** Typed-note category: translator note / study note / text-critical / map. */
+export const NoteTypeSchema = z.enum(['tn', 'sn', 'tc', 'map'])
+
+/** A cross-reference contained in a footnote (canonical coordinates). */
+export const CanonicalCrossRefSchema = z
+  .object({
+    to_book_order_index: z.number().int().min(1).max(66),
+    to_chapter: z.number().int().min(1),
+    to_verse_start: z.number().int().min(1),
+    to_verse_end: z.number().int().min(1).nullable().default(null),
+  })
+  .strict()
+  .superRefine((cr, ctx) => {
+    if (cr.to_verse_end !== null && cr.to_verse_end < cr.to_verse_start) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `cross-ref to_verse_end=${cr.to_verse_end} is before to_verse_start=${cr.to_verse_start}`,
+      })
+    }
+  })
+
 export const CanonicalFootnoteSchema = z
   .object({
     verse_number: z.number().int().min(1),
     text: z.string().min(1),
+    // Optional translator's-note metadata. All default to the server's
+    // defaults so plain `{verse_number,text}` footnotes — and translations
+    // that carry explicit-null note fields (e.g. ESV) — both validate. The
+    // char_offset-within-verse bound is checked at the chapter level.
+    note_type: NoteTypeSchema.nullable().default(null),
+    char_offset: z.number().int().min(0).nullable().default(null),
+    marker: z.number().int().nullable().default(null),
+    ordinal: z.number().int().min(0).nullable().default(null),
+    cross_refs: z.array(CanonicalCrossRefSchema).default([]),
   })
   .strict()
 
@@ -81,6 +111,21 @@ export const CanonicalChapterSchema = z
           message: `chapter ${chapter.number} footnote verse_number=${footnote.verse_number} does not match any verse`,
         })
         return
+      }
+    }
+
+    // A char-anchored footnote's offset must fall within its verse's text
+    // (offset == length is allowed — it anchors at the end). Footnotes whose
+    // verse is missing are already reported above, so all refs are valid here.
+    const verseLen = new Map(chapter.verses.map((v) => [v.number, v.text.length]))
+    for (const footnote of chapter.footnotes) {
+      if (footnote.char_offset == null) continue
+      const len = verseLen.get(footnote.verse_number)
+      if (len !== undefined && footnote.char_offset > len) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `chapter ${chapter.number} footnote on verse ${footnote.verse_number} has char_offset=${footnote.char_offset} beyond verse length ${len}`,
+        })
       }
     }
   })
@@ -162,6 +207,7 @@ export const CanonicalTranslationSchema = z
 
 export type CanonicalVerse = z.infer<typeof CanonicalVerseSchema>
 export type CanonicalHeading = z.infer<typeof CanonicalHeadingSchema>
+export type CanonicalCrossRef = z.infer<typeof CanonicalCrossRefSchema>
 export type CanonicalFootnote = z.infer<typeof CanonicalFootnoteSchema>
 export type CanonicalChapter = z.infer<typeof CanonicalChapterSchema>
 export type CanonicalBook = z.infer<typeof CanonicalBookSchema>
