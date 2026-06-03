@@ -1,13 +1,44 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { isOmittedVerse } from "@/lib/bibleText";
 import type { FontSize, ReaderLayout } from "@/lib/storage";
 import type {
   ChapterResponse,
+  CrossRefResponse,
   FootnoteResponse,
   HeadingResponse,
+  NoteType,
   VerseResponse,
 } from "@/types/api";
+
+/** Display labels for typed translator's notes (mirrors the server). */
+const NOTE_TYPE_LABELS: Record<NoteType, string> = {
+  tn: "Translator's Note",
+  sn: "Study Note",
+  tc: "Text-Critical Note",
+  map: "Map",
+};
+
+/** "Book ch:start" or "Book ch:start-end" (mirrors the server's crossRefLabel). */
+function crossRefLabel(xr: CrossRefResponse): string {
+  const base = `${xr.to_book} ${xr.to_chapter}:${xr.to_verse_start}`;
+  return xr.to_verse_end ? `${base}-${xr.to_verse_end}` : base;
+}
+
+/**
+ * Target reader URL for a cross-ref (mirrors the server's crossRefUrl). `to_book`
+ * is the target's abbreviation — a "navigable alias" that `getChapter` resolves
+ * to the canonical book via `getBookByName`. `?range` is always set.
+ */
+function crossRefUrl(translationCode: string, xr: CrossRefResponse): string {
+  const end = xr.to_verse_end ?? xr.to_verse_start;
+  return (
+    `/read/${encodeURIComponent(translationCode)}` +
+    `/${encodeURIComponent(xr.to_book)}/${xr.to_chapter}` +
+    `?range=${xr.to_verse_start}-${end}`
+  );
+}
 
 const FONT_SIZE_CLASS: Record<FontSize, string> = {
   S: "text-sm leading-7",
@@ -130,9 +161,10 @@ function Heading({ heading }: HeadingProps): JSX.Element {
 
 interface FootnoteMarkerProps {
   footnotes: FootnoteResponse[];
+  translationCode: string;
 }
 
-function FootnoteMarker({ footnotes }: FootnoteMarkerProps): JSX.Element | null {
+function FootnoteMarker({ footnotes, translationCode }: FootnoteMarkerProps): JSX.Element | null {
   const [open, setOpen] = useState(false);
   if (footnotes.length === 0) return null;
   return (
@@ -151,10 +183,34 @@ function FootnoteMarker({ footnotes }: FootnoteMarkerProps): JSX.Element | null 
       {open && (
         <span
           role="note"
-          className="absolute left-1/2 z-10 mt-1 w-64 -translate-x-1/2 rounded border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          className="absolute left-1/2 z-10 mt-1 w-64 -translate-x-1/2 space-y-2 rounded border border-slate-200 bg-white p-2 text-left text-xs text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
         >
           {footnotes.map((f) => (
-            <div key={f.id}>{f.text}</div>
+            <span key={f.id} className="block">
+              {f.note_type && (
+                <span
+                  data-testid="note-type"
+                  className="mb-0.5 block font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300"
+                >
+                  {NOTE_TYPE_LABELS[f.note_type]}
+                </span>
+              )}
+              <span className="block whitespace-pre-wrap">{f.text}</span>
+              {f.cross_refs.length > 0 && (
+                <span className="mt-1 flex flex-wrap gap-1">
+                  {f.cross_refs.map((xr, i) => (
+                    <Link
+                      key={`${xr.to_book}-${xr.to_chapter}-${xr.to_verse_start}-${i}`}
+                      to={crossRefUrl(translationCode, xr)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded border border-sky-200 bg-white px-2 py-0.5 text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300"
+                    >
+                      {crossRefLabel(xr)}
+                    </Link>
+                  ))}
+                </span>
+              )}
+            </span>
           ))}
         </span>
       )}
@@ -196,7 +252,10 @@ function VerseLayout({
               {verse.number}
             </span>
             <span>{verse.text}</span>
-            <FootnoteMarker footnotes={verse.footnotes} />
+            <FootnoteMarker
+              footnotes={verse.footnotes}
+              translationCode={chapter.translation_code}
+            />
           </>
         );
         return (
@@ -275,7 +334,10 @@ function ParagraphLayout({
           {verse.number}
         </sup>
         <span>{verse.text}</span>
-        <FootnoteMarker footnotes={verse.footnotes} />
+        <FootnoteMarker
+          footnotes={verse.footnotes}
+          translationCode={chapter.translation_code}
+        />
       </>
     );
     buffer.push(
