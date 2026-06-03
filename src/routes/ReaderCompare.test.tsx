@@ -182,3 +182,32 @@ describe("ReaderPage compare-mode — responsive layout (no-overflow fix)", () =
     ).toBeInTheDocument();
   });
 });
+
+describe("ReaderPage compare-mode — one picker per pane (independence)", () => {
+  it("hides the ControlsBar picker in compare mode; exactly two pickers (one per pane)", async () => {
+    renderReader("/read/TST/John/1?compare=BSB");
+    await pinText(await comparisonRegion(), "BSB John 1:1");
+    // The exact accessible name "Translation" is the ControlsBar picker only.
+    expect(screen.queryByRole("combobox", { name: "Translation" })).not.toBeInTheDocument();
+    // The two pane pickers ("Primary/Comparison translation") remain.
+    expect(screen.getAllByRole("combobox", { name: /translation/i })).toHaveLength(2);
+  });
+
+  it("changing the primary pane's translation leaves the comparison pane unchanged", async () => {
+    const user = userEvent.setup();
+    renderReader("/read/TST/John/1?compare=BSB");
+    await pinText(await comparisonRegion(), "BSB John 1:1");
+    await user.selectOptions(
+      await screen.findByRole("combobox", { name: "Primary translation" }),
+      "KJV",
+    );
+    expect(await pinText(await primaryRegion(), "KJV John 1:1")).toBeInTheDocument();
+    // Comparison pane is independent — still BSB.
+    expect(await pinText(await comparisonRegion(), "BSB John 1:1")).toBeInTheDocument();
+  });
+
+  it("single-pane mode still renders the ControlsBar translation picker", async () => {
+    renderReader("/read/TST/John/1");
+    expect(await screen.findByRole("combobox", { name: "Translation" })).toBeInTheDocument();
+  });
+});

@@ -376,11 +376,13 @@ function ControlsBar(props: ControlsBarProps): JSX.Element {
       <div className="min-w-[16rem] flex-1">
         <JumpBar translationCode={props.translationCode} onResolved={props.onResolved} />
       </div>
-      <TranslationPicker
-        translations={props.translations}
-        currentCode={props.translationCode}
-        onChange={props.onTranslationChange}
-      />
+      {!props.isCompareMode && (
+        <TranslationPicker
+          translations={props.translations}
+          currentCode={props.translationCode}
+          onChange={props.onTranslationChange}
+        />
+      )}
       {!props.isCompareMode && (
         <button
           type="button"
