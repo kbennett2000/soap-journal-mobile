@@ -16,7 +16,7 @@
  * untouched by Model B, so it ports directly. See docs/schema.md.
  */
 
-import type { CanonicalTranslation } from '@/lib/schema/canonical'
+import type { CanonicalCrossRef, CanonicalTranslation } from '@/lib/schema/canonical'
 
 import type { DbExecutor } from './executor'
 
@@ -53,12 +53,23 @@ export async function loadTranslation(
     )
     const translationId = translation.lastInsertRowid
 
+    // order_index -> inserted book id (THIS translation), to resolve cross-ref
+    // targets in a second pass after every book exists (a ref may point at a
+    // book inserted later). Mirrors the server's `book_id_by_order`.
+    const bookIdByOrder = new Map<number, number>()
+    const pendingCrossRefs: {
+      footnoteId: number
+      fromVerseId: number
+      crossRefs: CanonicalCrossRef[]
+    }[] = []
+
     for (const canonicalBook of payload.books) {
       const book = await tx.run(
         'INSERT INTO books (translation_id, name, abbreviation, order_index) VALUES (?, ?, ?, ?)',
         [translationId, canonicalBook.name, canonicalBook.abbreviation, canonicalBook.order_index],
       )
       const bookId = book.lastInsertRowid
+      bookIdByOrder.set(canonicalBook.order_index, bookId)
 
       for (const canonicalChapter of canonicalBook.chapters) {
         const chapter = await tx.run(
@@ -94,15 +105,57 @@ export async function loadTranslation(
             [chapterId],
           )
           const verseIdByNumber = new Map(verseRows.map((r) => [r.number, r.id]))
-          await tx.runMany(
-            'INSERT INTO footnotes (verse_id, text) VALUES (?, ?)',
-            canonicalChapter.footnotes.map((f) => [
-              verseIdByNumber.get(f.verse_number),
-              f.text,
-            ]),
-          )
+
+          const footnoteSql =
+            'INSERT INTO footnotes (verse_id, text, note_type, char_offset, marker, ordinal) VALUES (?, ?, ?, ?, ?, ?)'
+          // ordinal is NOT NULL; a plain (unordered) footnote falls back to 0.
+          const footnoteValues = (f: (typeof canonicalChapter.footnotes)[number]) => [
+            verseIdByNumber.get(f.verse_number),
+            f.text,
+            f.note_type,
+            f.char_offset,
+            f.marker,
+            f.ordinal ?? 0,
+          ]
+
+          // Plain footnotes (the common case — the 13 bundled translations)
+          // stay on the bulk path. Only cross-ref-bearing footnotes need their
+          // own id, so insert those with run() to capture lastInsertRowid; the
+          // cross-references themselves go in after all books exist.
+          const plain = canonicalChapter.footnotes.filter((f) => f.cross_refs.length === 0)
+          if (plain.length > 0) {
+            await tx.runMany(footnoteSql, plain.map(footnoteValues))
+          }
+          for (const f of canonicalChapter.footnotes) {
+            if (f.cross_refs.length === 0) continue
+            const inserted = await tx.run(footnoteSql, footnoteValues(f))
+            pendingCrossRefs.push({
+              footnoteId: inserted.lastInsertRowid,
+              fromVerseId: verseIdByNumber.get(f.verse_number) as number,
+              crossRefs: f.cross_refs,
+            })
+          }
         }
       }
+    }
+
+    // Second pass: now that every book is inserted, resolve cross-ref targets
+    // (to_book_order_index -> this translation's book id) and bulk-insert.
+    const crossRefRows = pendingCrossRefs.flatMap(({ footnoteId, fromVerseId, crossRefs }) =>
+      crossRefs.map((cr) => [
+        footnoteId,
+        fromVerseId,
+        bookIdByOrder.get(cr.to_book_order_index),
+        cr.to_chapter,
+        cr.to_verse_start,
+        cr.to_verse_end,
+      ]),
+    )
+    if (crossRefRows.length > 0) {
+      await tx.runMany(
+        'INSERT INTO cross_references (footnote_id, from_verse_id, to_book_id, to_chapter, to_verse_start, to_verse_end) VALUES (?, ?, ?, ?, ?, ?)',
+        crossRefRows,
+      )
     }
   })
 

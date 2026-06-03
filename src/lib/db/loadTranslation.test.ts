@@ -234,3 +234,144 @@ describe('loadTranslation — column mapping', () => {
     expect(is_red_letter).toBe(1)
   })
 })
+
+// ---- v2: footnote note metadata + cross-references -------------------------
+
+/**
+ * Genesis 1 enriched with footnotes covering all four note types; verse 1's
+ * note is char-anchored, ordered, and carries two cross-refs (one single verse
+ * to John, one range to Psalms). Verse text is long enough for char_offset 13.
+ */
+function notesTranslation(code = 'NOTES'): CanonicalTranslation {
+  const books = Array.from({ length: 66 }, (_, i) => book(i + 1))
+  const g = ALL_BOOKS[0]
+  books[0] = {
+    name: g.name,
+    abbreviation: g.abbreviation,
+    order_index: g.order_index,
+    chapters: [
+      {
+        number: 1,
+        verses: Array.from({ length: 4 }, (_, v) => ({
+          number: v + 1,
+          text: 'In the beginning God created',
+        })),
+        footnotes: [
+          {
+            verse_number: 1,
+            text: 'tn The Hebrew term…',
+            note_type: 'tn',
+            char_offset: 13,
+            marker: 1,
+            ordinal: 0,
+            cross_refs: [
+              { to_book_order_index: 43, to_chapter: 1, to_verse_start: 1 },
+              { to_book_order_index: 19, to_chapter: 33, to_verse_start: 6, to_verse_end: 9 },
+            ],
+          },
+          { verse_number: 2, text: 'sn note', note_type: 'sn' },
+          { verse_number: 3, text: 'tc note', note_type: 'tc' },
+          { verse_number: 4, text: 'map note', note_type: 'map' },
+        ],
+      },
+    ],
+  }
+  return CanonicalTranslationSchema.parse({
+    code,
+    name: code,
+    language: 'en',
+    copyright: 'x',
+    books,
+  })
+}
+
+describe('loadTranslation — note metadata & cross-references', () => {
+  it('persists note columns and resolves cross-references to this translation', async () => {
+    await loadTranslation(db, notesTranslation())
+
+    // Footnote columns: all four note types present; verse 1 fully anchored.
+    const fns = await db.query<{
+      vn: number
+      note_type: string | null
+      char_offset: number | null
+      marker: number | null
+      ordinal: number
+    }>(
+      `SELECT v.number vn, f.note_type, f.char_offset, f.marker, f.ordinal
+         FROM footnotes f
+         JOIN verses v ON v.id = f.verse_id
+         JOIN chapters c ON c.id = v.chapter_id
+         JOIN books b ON b.id = c.book_id
+        WHERE b.name = 'Genesis'
+        ORDER BY v.number`,
+    )
+    expect(fns.map((f) => f.note_type)).toEqual(['tn', 'sn', 'tc', 'map'])
+    expect(fns[0]).toMatchObject({ vn: 1, char_offset: 13, marker: 1, ordinal: 0 })
+
+    // Cross-references: 2 rows, to_book_id resolved to THIS translation's books,
+    // from_verse_id pointing at the owning footnote's verse (Genesis 1:1).
+    const crs = await db.query<{
+      to_order: number
+      to_chapter: number
+      to_verse_start: number
+      to_verse_end: number | null
+      from_verse_number: number
+      from_book: string
+    }>(
+      `SELECT b.order_index to_order, cr.to_chapter, cr.to_verse_start, cr.to_verse_end,
+              fv.number from_verse_number, fb.name from_book
+         FROM cross_references cr
+         JOIN books b ON b.id = cr.to_book_id
+         JOIN verses fv ON fv.id = cr.from_verse_id
+         JOIN chapters fc ON fc.id = fv.chapter_id
+         JOIN books fb ON fb.id = fc.book_id
+        ORDER BY b.order_index`,
+    )
+    expect(crs).toHaveLength(2)
+    // Psalms (order 19) range, then John (order 43) single verse.
+    expect(crs[0]).toMatchObject({
+      to_order: 19,
+      to_chapter: 33,
+      to_verse_start: 6,
+      to_verse_end: 9,
+      from_verse_number: 1,
+      from_book: 'Genesis',
+    })
+    expect(crs[1]).toMatchObject({
+      to_order: 43,
+      to_chapter: 1,
+      to_verse_start: 1,
+      to_verse_end: null,
+      from_verse_number: 1,
+      from_book: 'Genesis',
+    })
+  })
+
+  it('a plain-footnote translation loads with NULL note fields, ordinal 0, no cross-refs', async () => {
+    await loadTranslation(db, fullTranslation({ enrichGenesis: true }))
+    const [fn] = await db.query<{ note_type: string | null; char_offset: number | null; ordinal: number }>(
+      'SELECT note_type, char_offset, ordinal FROM footnotes',
+    )
+    expect(fn.note_type).toBeNull()
+    expect(fn.char_offset).toBeNull()
+    expect(fn.ordinal).toBe(0)
+    expect(await count('cross_references')).toBe(0)
+  })
+
+  it('replace-by-code clears cross-references (cascade, no doubling, no orphans)', async () => {
+    await loadTranslation(db, notesTranslation())
+    expect(await count('cross_references')).toBe(2)
+
+    // Re-import the same code → replaced, not doubled.
+    await loadTranslation(db, notesTranslation())
+    expect(await count('cross_references')).toBe(2)
+
+    // Re-import the same code with NO notes → old footnotes + cross-refs cascade out.
+    await loadTranslation(db, fullTranslation({ code: 'NOTES', enrichGenesis: false }))
+    expect(await count('cross_references')).toBe(0)
+    // No orphan cross-refs left pointing at deleted footnotes.
+    expect(
+      await count('cross_references', 'WHERE footnote_id NOT IN (SELECT id FROM footnotes)'),
+    ).toBe(0)
+  })
+})

@@ -75,19 +75,45 @@ CREATE TABLE headings (
 CREATE INDEX ix_headings_chapter ON headings(chapter_id);
 
 CREATE TABLE footnotes (
-  id       INTEGER PRIMARY KEY,
-  verse_id INTEGER NOT NULL REFERENCES verses(id) ON DELETE CASCADE,
-  text     TEXT NOT NULL
+  id          INTEGER PRIMARY KEY,
+  verse_id    INTEGER NOT NULL REFERENCES verses(id) ON DELETE CASCADE,
+  text        TEXT NOT NULL,
+  -- v2: translator's-note metadata. NULL / 0 for the plain-footnote
+  -- translations (the 13 bundled). note_type NULL satisfies the CHECK.
+  note_type   TEXT CHECK (note_type IN ('tn','sn','tc','map')),  -- tn/sn/tc/map or NULL
+  char_offset INTEGER,                                            -- anchor into the verse text; NULL if unanchored
+  marker      INTEGER,                                            -- source-provenance marker; not semantic
+  ordinal     INTEGER NOT NULL DEFAULT 0                          -- render order within the verse, 0-based
 );
 CREATE INDEX ix_footnotes_verse ON footnotes(verse_id);
+
+-- v2: cross-references contained in a note. The target is a book id (resolved to
+-- the SAME translation at load time) + chapter/verse numbers, not a resolved verse
+-- row (targets may be ranges and may not all resolve). from_verse_id is the owning
+-- footnote's verse, kept denormalized for the future verse → references lookup.
+CREATE TABLE cross_references (
+  id             INTEGER PRIMARY KEY,
+  footnote_id    INTEGER NOT NULL REFERENCES footnotes(id) ON DELETE CASCADE,
+  from_verse_id  INTEGER NOT NULL REFERENCES verses(id)    ON DELETE CASCADE,
+  to_book_id     INTEGER NOT NULL REFERENCES books(id)     ON DELETE CASCADE,
+  to_chapter     INTEGER NOT NULL,
+  to_verse_start INTEGER NOT NULL,
+  to_verse_end   INTEGER
+);
+CREATE INDEX ix_cross_references_footnote_id   ON cross_references(footnote_id);
+CREATE INDEX ix_cross_references_from_verse_id ON cross_references(from_verse_id);
+CREATE INDEX ix_cross_references_to_target     ON cross_references(to_book_id, to_chapter, to_verse_start);
 ```
 
 Insert order for the shared routine: translation → books → chapters → verses →
-headings → footnotes. Map the canonical JSON `copyright` field to `copyright_notice`;
-set `loaded_at` to now at insert. (Replace-by-code on re-import: delete the existing
-translation by `code` and re-insert; `ON DELETE CASCADE` clears dependents. Because
-journal tables hold no FK into Bible tables — see below — re-import never touches
-journal integrity.)
+headings → footnotes, then a second pass inserting `cross_references` once every book
+exists (a cross-ref may target a book inserted later; `to_book_id` resolves via an
+`order_index → book id` map). Map the canonical JSON `copyright` field to
+`copyright_notice`; set `loaded_at` to now at insert. Footnote `ordinal` falls back to
+0 when the canonical note omits it. (Replace-by-code on re-import: delete the existing
+translation by `code` and re-insert; `ON DELETE CASCADE` clears dependents —
+`cross_references` included, via its footnote/verse/book FKs. Because journal tables
+hold no FK into Bible tables — see below — re-import never touches journal integrity.)
 
 ## Journal tables — adapted for single-user, import-resilient
 
@@ -181,15 +207,25 @@ Notes:
 
 ## Migrations & versioning
 
-1. Migration `v1` (one ordered set) creates every table above.
-2. `build-bible-db` runs migration `v1` on an empty DB, inserts the 13 public-domain
-   translations via the shared routine, sets `user_version = 1`, and emits the asset.
-   Journal tables ship empty.
-3. First launch: if no working DB exists in app storage, copy the asset in. Versions
+Current schema version: **`user_version = 2`**.
+
+1. Migration `v1` (one ordered set) creates every table above (footnotes text-only).
+2. Migration `v2` adds the footnote note-metadata columns (`note_type`/`char_offset`/
+   `marker`/`ordinal`) and the `cross_references` table (lockstep with the server's
+   alembic `4708ebfdc41a`). Forward-only and safe on a populated `footnotes` table:
+   SQLite `ADD COLUMN` takes a column-level CHECK + a constant `NOT NULL DEFAULT`, and
+   existing rows take the defaults (note fields NULL, `ordinal` 0).
+3. `build-bible-db` runs the full migration set on an empty DB, inserts the 13
+   public-domain translations via the shared routine, sets `user_version = 2`, and
+   emits the asset. The 13 are plain-footnote, so their note columns are NULL / 0 and
+   they have no `cross_references` rows. Journal tables ship empty.
+4. First launch: if no working DB exists in app storage, copy the asset in. Versions
    match → no migration runs. (File existence is the copy guard; never re-copy.)
-4. Future schema changes ship as migrations `v2`, `v3`, … advancing `user_version`
-   in place. User data is never clobbered.
-5. Adding more bundled translations in a later release = an in-app insert via the
+5. An installed DB at an older `user_version` forward-migrates in place on startup
+   (e.g. a v1 DB with user-imported translations advances to v2 — its footnotes keep
+   their text and gain the defaulted columns; no re-import needed). User data is never
+   clobbered.
+6. Adding more bundled translations in a later release = an in-app insert via the
    shared routine, **not** an asset re-copy.
 
 ## Decision to confirm

@@ -126,10 +126,48 @@ CREATE INDEX ix_entry_scripture_passage
   ON entry_scripture_verses(book_order_index, chapter_number, verse_number);
 `
 
-const MIGRATIONS: Migration[] = [
+/**
+ * v2 — translator's-note metadata + cross-references (lockstep with the server's
+ * alembic `4708ebfdc41a`). Forward-only and safe on a POPULATED v1 `footnotes`
+ * table: SQLite `ADD COLUMN` permits a column-level CHECK and a constant
+ * NOT NULL DEFAULT, and existing rows take the defaults (note fields NULL,
+ * ordinal 0). NULL satisfies the `note_type` CHECK. `cross_references` cascades
+ * from footnotes/verses/books, so the loader's replace-by-code delete reaches it
+ * without extra teardown.
+ */
+const V2_SCHEMA_SQL = `
+ALTER TABLE footnotes ADD COLUMN note_type   TEXT CHECK (note_type IN ('tn','sn','tc','map'));
+ALTER TABLE footnotes ADD COLUMN char_offset INTEGER;
+ALTER TABLE footnotes ADD COLUMN marker      INTEGER;
+ALTER TABLE footnotes ADD COLUMN ordinal     INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE cross_references (
+  id             INTEGER PRIMARY KEY,
+  footnote_id    INTEGER NOT NULL REFERENCES footnotes(id) ON DELETE CASCADE,
+  from_verse_id  INTEGER NOT NULL REFERENCES verses(id)    ON DELETE CASCADE,
+  to_book_id     INTEGER NOT NULL REFERENCES books(id)     ON DELETE CASCADE,
+  to_chapter     INTEGER NOT NULL,
+  to_verse_start INTEGER NOT NULL,
+  to_verse_end   INTEGER
+);
+CREATE INDEX ix_cross_references_footnote_id   ON cross_references(footnote_id);
+CREATE INDEX ix_cross_references_from_verse_id ON cross_references(from_verse_id);
+CREATE INDEX ix_cross_references_to_target     ON cross_references(to_book_id, to_chapter, to_verse_start);
+`
+
+/**
+ * The ordered migration set. Exported so tests can apply a subset (e.g. v1 only,
+ * then forward to v2) to exercise the on-device forward-migration path. Runtime
+ * callers use `runMigrations`, not this directly.
+ */
+export const MIGRATIONS: Migration[] = [
   {
     version: 1,
     up: (tx) => tx.execScript(V1_SCHEMA_SQL),
+  },
+  {
+    version: 2,
+    up: (tx) => tx.execScript(V2_SCHEMA_SQL),
   },
 ]
 
