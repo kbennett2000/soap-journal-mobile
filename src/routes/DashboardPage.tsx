@@ -56,7 +56,7 @@ export function DashboardPage(): JSX.Element {
       <div className="grid gap-6 lg:grid-cols-2">
         <section
           aria-labelledby="dash-recent-heading"
-          className="rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+          className="min-w-0 rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
         >
           <div className="mb-3 flex items-center justify-between">
             <h2
@@ -118,7 +118,7 @@ export function DashboardPage(): JSX.Element {
 
         <section
           aria-labelledby="dash-onthisday-heading"
-          className="rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+          className="min-w-0 rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
         >
           <div className="mb-3">
             <h2
