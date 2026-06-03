@@ -372,3 +372,139 @@ describe('resolveReference', () => {
     await expect(resolveReference(db, 'Frodo 3:16', 'AAA')).rejects.toBeInstanceOf(ApiError)
   })
 })
+
+// ---- N3: rich footnotes + cross-references (read path) ----------------------
+
+const JOHN_ABBR = ALL_BOOKS.find((b) => b.order_index === 43)!.abbreviation
+const PSALMS_ABBR = ALL_BOOKS.find((b) => b.order_index === 19)!.abbreviation
+
+/**
+ * A translation whose Genesis 1:3 carries TWO footnotes (to exercise ordinal
+ * ordering): an `sn` note at ordinal 1, and a `tn` note at ordinal 0 that is
+ * char-anchored, ordered, marked, and carries two cross-refs (a single verse to
+ * John, a range to Psalms). The `tn` note must read out FIRST (ordinal 0).
+ */
+function buildEnriched(code = 'NETT'): CanonicalTranslation {
+  const books = ALL_BOOKS.map((spec) => {
+    if (spec.order_index === 1) {
+      return {
+        name: spec.name,
+        abbreviation: spec.abbreviation,
+        order_index: spec.order_index,
+        chapters: [
+          {
+            number: 1,
+            verses: [1, 2, 3].map((n) => ({ number: n, text: 'In the beginning God created' })),
+            footnotes: [
+              // Listed sn-first (ordinal 1) on purpose; the read orders by ordinal.
+              { verse_number: 3, text: 'sn the second note', note_type: 'sn', ordinal: 1 },
+              {
+                verse_number: 3,
+                text: 'tn the first note',
+                note_type: 'tn',
+                char_offset: 4,
+                marker: 1,
+                ordinal: 0,
+                cross_refs: [
+                  { to_book_order_index: 43, to_chapter: 1, to_verse_start: 1 },
+                  { to_book_order_index: 19, to_chapter: 33, to_verse_start: 6, to_verse_end: 9 },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+    }
+    return {
+      name: spec.name,
+      abbreviation: spec.abbreviation,
+      order_index: spec.order_index,
+      chapters: [{ number: 1, verses: verses(1, spec.name) }],
+    }
+  })
+  return CanonicalTranslationSchema.parse({
+    code,
+    name: code,
+    language: 'en',
+    copyright: `© ${code}`,
+    books,
+  })
+}
+
+describe('versesWithFootnotes — rich footnotes & cross-references', () => {
+  it('getChapter returns typed notes (in ordinal order) with resolved cross-refs', async () => {
+    await loadTranslation(db, buildEnriched('NETT'))
+    const chapter = await getChapter(db, 'NETT', 'Genesis', 1)
+    const v3 = chapter.verses.find((v) => v.number === 3)!
+
+    // Ordinal order: the tn note (ordinal 0) precedes the sn note (ordinal 1),
+    // despite being listed second in the source.
+    expect(v3.footnotes.map((f) => f.note_type)).toEqual(['tn', 'sn'])
+
+    const tn = v3.footnotes[0]
+    expect(tn).toMatchObject({
+      text: 'tn the first note',
+      note_type: 'tn',
+      char_offset: 4,
+      marker: 1,
+      ordinal: 0,
+    })
+    // Cross-refs in cr.id order: John single verse, then the Psalms range.
+    expect(tn.cross_refs).toEqual([
+      { to_book: JOHN_ABBR, to_chapter: 1, to_verse_start: 1, to_verse_end: null },
+      { to_book: PSALMS_ABBR, to_chapter: 33, to_verse_start: 6, to_verse_end: 9 },
+    ])
+
+    // The sn note has the rich fields defaulted and no cross-refs.
+    expect(v3.footnotes[1]).toMatchObject({
+      note_type: 'sn',
+      char_offset: null,
+      marker: null,
+      ordinal: 1,
+      cross_refs: [],
+    })
+  })
+
+  it('resolveReference carries the same rich footnote shape (shared helper)', async () => {
+    await loadTranslation(db, buildEnriched('NETT'))
+    const { verses: resolved } = await resolveReference(db, 'Genesis 1:3', 'NETT')
+    const note = resolved[0].footnotes[0]
+    expect(note.note_type).toBe('tn')
+    expect(note.cross_refs[0]).toMatchObject({ to_book: JOHN_ABBR, to_verse_end: null })
+  })
+
+  it('a plain footnote reads with null note fields, ordinal 0, no cross-refs', async () => {
+    // The shared buildTranslation fixture has a plain footnote on Genesis 1:2.
+    await loadTranslation(db, buildTranslation('AAA'))
+    const chapter = await getChapter(db, 'AAA', 'Genesis', 1)
+    const v2 = chapter.verses.find((v) => v.number === 2)!
+    expect(v2.footnotes).toHaveLength(1)
+    expect(v2.footnotes[0]).toMatchObject({
+      text: 'a footnote on verse 2',
+      note_type: null,
+      char_offset: null,
+      marker: null,
+      ordinal: 0,
+      cross_refs: [],
+    })
+  })
+
+  it('uses a fixed query budget — no N+1 across verses/footnotes/cross-refs', async () => {
+    await loadTranslation(db, buildEnriched('NETT'))
+    const counting = new CountingExecutor(db)
+    await getChapter(counting, 'NETT', 'Genesis', 1)
+    const footnoteQueries = counting.queries.filter((q) => /from footnotes/i.test(q))
+    const crossRefQueries = counting.queries.filter((q) => /from cross_references/i.test(q))
+    expect(footnoteQueries.length).toBe(1)
+    expect(crossRefQueries.length).toBe(1)
+  })
+
+  it('skips the cross-ref query entirely when a chapter has no footnotes', async () => {
+    await loadTranslation(db, buildEnriched('NETT'))
+    const counting = new CountingExecutor(db)
+    // Exodus has the default chapter (one verse, no footnotes).
+    await getChapter(counting, 'NETT', 'Exodus', 1)
+    expect(counting.queries.filter((q) => /from footnotes/i.test(q)).length).toBe(1)
+    expect(counting.queries.filter((q) => /from cross_references/i.test(q)).length).toBe(0)
+  })
+})

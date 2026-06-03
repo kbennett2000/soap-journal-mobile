@@ -41,9 +41,27 @@ export interface TranslationDetailResponse {
   books: BookSummary[]
 }
 
+/** Typed-note category. Must stay in lockstep with `NoteTypeSchema` in `lib/schema/canonical.ts`. */
+export type NoteType = 'tn' | 'sn' | 'tc' | 'map'
+
+/** A cross-reference from a note to a verse (or range) in the same translation. */
+export interface CrossRefResponse {
+  to_book: string // target book abbreviation (resolved within this translation)
+  to_chapter: number
+  to_verse_start: number
+  to_verse_end: number | null
+}
+
 export interface FootnoteResponse {
   id: number
   text: string
+  // Rich-note fields. Plain footnotes (the bundled translations) come back with
+  // null note fields, ordinal 0, and no cross-refs — clients branch on note_type.
+  note_type: NoteType | null
+  char_offset: number | null
+  marker: number | null
+  ordinal: number
+  cross_refs: CrossRefResponse[]
 }
 
 export interface VerseResponse {

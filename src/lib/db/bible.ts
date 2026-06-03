@@ -22,8 +22,10 @@ import type {
   BookSummary,
   ChapterPointer,
   ChapterResponse,
+  CrossRefResponse,
   FootnoteResponse,
   HeadingResponse,
+  NoteType,
   ResolvedReferenceResponse,
   TranslationDetailResponse,
   TranslationListResponse,
@@ -157,7 +159,14 @@ async function bookSummaryFor(executor: DbExecutor, book: BookRow): Promise<Book
   }
 }
 
-/** Verses for a chapter, each with its footnotes — 2 queries, never per-verse. */
+/**
+ * Verses for a chapter, each with its footnotes (rich note metadata + nested
+ * cross-references). Fixed query budget, no N+1: one SELECT for verses, one for
+ * footnotes, and — only when the chapter has footnotes — one for cross-refs
+ * (joined to `books` for the target abbreviation). Mirrors the server's
+ * `_verses_with_footnotes`. Plain translations come back with the rich fields
+ * defaulted (null note fields, ordinal 0, empty cross_refs).
+ */
 async function versesWithFootnotes(
   executor: DbExecutor,
   chapterId: number,
@@ -176,15 +185,67 @@ async function versesWithFootnotes(
   }
 
   const verseIds = verseRows.map((v) => v.id)
-  const placeholders = verseIds.map(() => '?').join(', ')
-  const footnoteRows = await executor.query<{ id: number; verse_id: number; text: string }>(
-    `SELECT id, verse_id, text FROM footnotes WHERE verse_id IN (${placeholders}) ORDER BY id ASC`,
+  const versePlaceholders = verseIds.map(() => '?').join(', ')
+  const footnoteRows = await executor.query<{
+    id: number
+    verse_id: number
+    text: string
+    note_type: NoteType | null
+    char_offset: number | null
+    marker: number | null
+    ordinal: number
+  }>(
+    `SELECT id, verse_id, text, note_type, char_offset, marker, ordinal
+       FROM footnotes
+      WHERE verse_id IN (${versePlaceholders})
+      ORDER BY verse_id ASC, ordinal ASC, id ASC`,
     verseIds,
   )
+
+  // Cross-refs: one query for the whole chapter, joined to books for the target
+  // abbreviation — skipped entirely when the chapter has no footnotes.
+  const crossRefsByFootnote = new Map<number, CrossRefResponse[]>()
+  if (footnoteRows.length > 0) {
+    const footnoteIds = footnoteRows.map((f) => f.id)
+    const fnPlaceholders = footnoteIds.map(() => '?').join(', ')
+    const crossRefRows = await executor.query<{
+      footnote_id: number
+      to_book: string
+      to_chapter: number
+      to_verse_start: number
+      to_verse_end: number | null
+    }>(
+      `SELECT cr.footnote_id, b.abbreviation AS to_book, cr.to_chapter, cr.to_verse_start, cr.to_verse_end
+         FROM cross_references cr
+         JOIN books b ON b.id = cr.to_book_id
+        WHERE cr.footnote_id IN (${fnPlaceholders})
+        ORDER BY cr.id ASC`,
+      footnoteIds,
+    )
+    for (const cr of crossRefRows) {
+      const list = crossRefsByFootnote.get(cr.footnote_id) ?? []
+      list.push({
+        to_book: cr.to_book,
+        to_chapter: cr.to_chapter,
+        to_verse_start: cr.to_verse_start,
+        to_verse_end: cr.to_verse_end,
+      })
+      crossRefsByFootnote.set(cr.footnote_id, list)
+    }
+  }
+
   const footnotesByVerse = new Map<number, FootnoteResponse[]>()
   for (const fn of footnoteRows) {
     const list = footnotesByVerse.get(fn.verse_id) ?? []
-    list.push({ id: fn.id, text: fn.text })
+    list.push({
+      id: fn.id,
+      text: fn.text,
+      note_type: fn.note_type,
+      char_offset: fn.char_offset,
+      marker: fn.marker,
+      ordinal: fn.ordinal,
+      cross_refs: crossRefsByFootnote.get(fn.id) ?? [],
+    })
     footnotesByVerse.set(fn.verse_id, list)
   }
 
