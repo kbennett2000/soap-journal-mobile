@@ -49,6 +49,48 @@ npm run build && npx cap sync android      # carry web + DB asset into the nativ
 npx cap run android                         # build, install, launch on a connected device
 ```
 
+## Building a release APK
+
+A signed, **universal** release APK (all CPU architectures in one file — users never pick an
+architecture; the ~75 MB Bible asset is bundled inside) for public sideloading.
+
+Prerequisites: JDK 21 (above), and carry the latest web build + DB asset into the native project
+first:
+
+```bash
+npm run build && npx cap sync android
+cd android && ./gradlew assembleRelease
+# signed →   android/app/build/outputs/apk/release/app-release.apk
+# (without keystore.properties → app-release-unsigned.apk; the build still succeeds)
+```
+
+Signing is driven by **`android/keystore.properties`** (gitignored — never committed). Create it
+once with your keystore's details:
+
+```properties
+storeFile=/absolute/or/android-relative/path/to/soapjournal-release.keystore
+storePassword=…
+keyAlias=…
+keyPassword=…
+```
+
+When this file is absent (contributors, CI, debug builds), the release signing step is skipped and
+`assembleRelease` produces an *unsigned* APK rather than failing — and `npx cap run android` (debug)
+is unaffected.
+
+**The keystore is yours to generate and guard — it is not scripted, and never touches git.** Make
+it once with `keytool`:
+
+```bash
+keytool -genkeypair -v -keystore soapjournal-release.keystore -alias soapjournal \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+**Back the keystore up.** If you lose it you can never ship an in-place update again — Android
+refuses to install an APK signed by a different key over an existing one, so every user would have
+to uninstall and reinstall (losing local data). Keep `soapjournal-release.keystore` and
+`keystore.properties` off git and in safe storage.
+
 ---
 
 This project was bootstrapped from the React + TypeScript + Vite template.

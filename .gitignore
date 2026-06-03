@@ -36,3 +36,8 @@ pnpm-debug.log*
 
 # Claude Code personal overrides
 .claude/settings.local.json
+
+# Signing secrets — never commit
+android/keystore.properties
+*.keystore
+*.jks

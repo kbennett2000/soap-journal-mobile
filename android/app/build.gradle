@@ -1,5 +1,16 @@
 apply plugin: 'com.android.application'
 
+// Release signing is driven by a gitignored android/keystore.properties (keys:
+// storeFile, storePassword, keyAlias, keyPassword). When that file is absent —
+// debug builds, CI, and contributors without the keystore — the release
+// signingConfig is skipped and `assembleRelease` still succeeds (producing an
+// unsigned APK). No secrets live in the repo.
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
 android {
     namespace = "com.kbennett.soapjournal"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,12 +27,31 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+    signingConfigs {
+        // Defined only when keystore.properties is present; otherwise release
+        // builds remain unsigned rather than failing.
+        if (keystorePropsFile.exists()) {
+            release {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
         }
     }
+    buildTypes {
+        release {
+            // Keep code/resource shrinking OFF: a sideload release must retain the
+            // @capacitor-community/sqlite native lib and the bundled ~75MB Bible
+            // asset. (Assets aren't code-shrunk regardless; this is belt-and-braces.)
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+    // No ABI splits: one universal APK ships all architectures (users never pick one).
 }
 
 repositories {
