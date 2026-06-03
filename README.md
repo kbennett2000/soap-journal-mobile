@@ -283,6 +283,28 @@ Android refuses to install an APK signed by a different key over an existing one
 user would have to uninstall and reinstall (losing local data). Keep
 `soapjournal-release.keystore` and `keystore.properties` off git and in safe storage.
 
+### Verify the signature before uploading (required)
+
+After `assembleRelease`, verify the APK carries **both** signature schemes before you upload
+it (`apksigner` ships in the Android SDK under `build-tools/<version>/`):
+
+```bash
+apksigner verify --verbose android/app/build/outputs/apk/release/app-release.apk
+```
+
+Confirm the output shows **both**:
+
+```
+Verified using v1 scheme (JAR signing): true
+Verified using v2 scheme (APK Signature Scheme v2): true
+```
+
+**Why this matters:** a **v2-only** APK installs fine via `adb install` but fails
+**tap-to-install on some devices (notably Samsung)** with *"App not installed."* Because
+`minSdkVersion` is 24, the Android Gradle Plugin would otherwise drop the legacy v1 signature;
+the release `signingConfig` now sets `enableV1Signing true` + `enableV2Signing true` to force
+both. Run this check every release so a signing regression never ships.
+
 ### Versioning each release
 
 The app version lives in [`android/app/build.gradle`](android/app/build.gradle)
@@ -290,7 +312,9 @@ The app version lives in [`android/app/build.gradle`](android/app/build.gradle)
 `versionCode`** (1 → 2 → 3 …) and set `versionName` to the new SemVer (e.g. `"1.1.0"`), add a
 matching entry to [`CHANGELOG.md`](CHANGELOG.md), and sign with the **same keystore** as
 before. A non-increasing `versionCode` makes Android **reject** the new APK as an in-place
-update — so this bump is not optional.
+update — so this bump is not optional. Then run the
+[signature check](#verify-the-signature-before-uploading-required) (v1 **and** v2 true) before
+uploading.
 
 More design detail lives in [`docs/`](docs/) (architecture, schema, first-run & import,
 backup & restore).
