@@ -29,7 +29,7 @@ export function TranslationPicker({
       aria-label={ariaLabel}
       value={currentCode}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      className="h-9 min-w-0 max-w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
     >
       {translations.map((t) => (
         <option key={t.code} value={t.code}>

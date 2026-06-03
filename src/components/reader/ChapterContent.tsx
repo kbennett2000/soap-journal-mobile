@@ -79,7 +79,7 @@ export function ChapterContent({
   return (
     <article
       data-testid="chapter-content"
-      className={`prose prose-slate max-w-none dark:prose-invert ${sizeClass}`}
+      className={`prose prose-slate max-w-none break-words dark:prose-invert ${sizeClass}`}
     >
       <h1 className="!mb-2 !mt-0 text-2xl font-semibold">
         {chapter.book.name} {chapter.chapter_number}

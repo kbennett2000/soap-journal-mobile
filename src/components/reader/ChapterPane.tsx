@@ -49,7 +49,7 @@ export function ChapterPane({
 
   return (
     <section aria-label={label} className="min-w-0 flex-1">
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex min-w-0 items-center gap-2">
         <TranslationPicker
           translations={translations}
           currentCode={translationCode}

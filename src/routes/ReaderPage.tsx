@@ -237,7 +237,7 @@ function ReaderInner({
   }, [chapterQuery.data?.previous, chapterQuery.data?.next]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-clip">
       <ControlsBar
         translationCode={translationCode}
         translations={translations}
@@ -258,10 +258,10 @@ function ReaderInner({
       />
 
       {isCompareMode ? (
-        // Phone-first: true two columns (not stacked) so the same verse is
-        // visible in both at once; verse layout is forced so verses roughly
-        // align. min-w-0 on each pane prevents overflow.
-        <div className="grid grid-cols-2 gap-3">
+        // Responsive: stacked on a narrow phone (two ~170px columns are
+        // unreadable and overflowed the viewport), side-by-side from sm: up.
+        // Verse layout is forced so the two columns roughly align when wide.
+        <div data-testid="compare-grid" className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
           <ChapterPane
             translationCode={translationCode}
             bookName={bookName}

@@ -165,3 +165,20 @@ describe("ReaderPage compare-mode — panes", () => {
     expect(await comparisonRegion()).toBeInTheDocument();
   });
 });
+
+// STRUCTURE ONLY: happy-dom can't measure pixels, so it can't prove the absence
+// of horizontal overflow — that's the on-device gate. These assert the chosen
+// responsive layout (stacked on narrow, side-by-side from sm:) is wired up.
+describe("ReaderPage compare-mode — responsive layout (no-overflow fix)", () => {
+  it("lays the two panes out in a responsive grid containing both panes", async () => {
+    renderReader("/read/TST/John/1?compare=BSB");
+    const grid = await screen.findByTestId("compare-grid");
+    // Stacked on narrow phones, side-by-side from the sm breakpoint up.
+    expect(grid.className).toContain("grid-cols-1");
+    expect(grid.className).toContain("sm:grid-cols-2");
+    expect(within(grid).getByRole("region", { name: "Primary translation" })).toBeInTheDocument();
+    expect(
+      within(grid).getByRole("region", { name: "Comparison translation" }),
+    ).toBeInTheDocument();
+  });
+});
