@@ -82,11 +82,20 @@ normal for apps shared this way — here's exactly what to expect.
    app install apps — this prompt appears because the app isn't from the Play Store, not
    because anything is wrong. Tap **Settings → allow from this source**, then back out.
    ![Allow from this source](docs/screenshots/install-unknown-sources.png)
-4. **"Unrecognized app" / Play Protect.** Android may warn that it doesn't recognize the
-   developer. This is expected for **any** app installed outside the Play Store. Tap
-   **More details → Install anyway** to continue.
-   ![Play Protect notice](docs/screenshots/install-play-protect.png)
-5. **Open it.** The reader already has all 13 translations loaded. That's it — you're
+4. **Play Protect / "unrecognized app" — tap "More details".** Android may warn that it
+   doesn't recognize the developer. This is expected for **any** app installed outside the
+   Play Store; nothing is wrong. On this screen, tap **More details** — **not** "Got it".
+   ![Play Protect warning — tap More details](docs/screenshots/install-play-protect.png)
+5. **Tap "Install anyway".** Once *More details* expands the warning, tap **Install anyway**
+   to continue the install.
+   ![Play Protect expanded — tap Install anyway](docs/screenshots/install-play-protect-2.png)
+
+   > ⚠️ **Don't tap "Got it" on either screen.** "Got it" cancels the install and you'll see
+   > **"App not installed."** If that happens, just reopen the APK and choose **More details →
+   > Install anyway**.
+
+   ![Tapping "Got it" results in "App not installed"](docs/screenshots/install-got-it-error.png)
+6. **Open it.** The reader already has all 13 translations loaded. That's it — you're
    reading.
 
 ---
