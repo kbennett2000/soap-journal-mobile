@@ -3,7 +3,11 @@
 # SOAP Journal
 
 A warm, distraction-free way to **read the Bible and journal through it** on your Android
-phone — completely offline. Read in any of **13 built-in translations**, compare two
+phone — completely offline. That means it just works. No signing up for another account,
+no copying and pasting text message codes, no ads popping up, no alerts interrupting you,
+no spam emails, no data collectors tracking you, nothing, nada, zip, zilch, zero!
+It's YOU and the Word of GOD!
+Read in any of **13 built-in translations**, compare two
 side by side, and capture what you're learning with the time-tested **SOAP** method
 (Scripture · Observation · Application · Prayer).
 
